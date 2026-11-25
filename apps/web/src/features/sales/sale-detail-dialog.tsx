@@ -6,7 +6,6 @@ import {
   PAYMENT_METHOD_LABELS,
   SALE_STATUS_TRANSITIONS,
   type SaleDetailResponse,
-  type SaleStatus,
 } from '@admin/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,16 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatDateTime } from '@/lib/format';
-import { useSaleDetail, useUpdateSaleStatus } from './api';
+import { useSaleDetail } from './api';
 import { PaymentStatusBadge, SaleStatusBadge } from './status-badges';
+import { SALE_ACTION_LABELS, useSaleStatusChange } from './use-sale-status-change';
 
-const ACTION_LABELS: Record<SaleStatus, string> = {
-  PENDING: 'Volver a pendiente',
-  PREPARING: 'Pasar a preparación',
-  SHIPPED: 'Marcar como enviado',
-  COMPLETED: 'Completar pedido',
-  CANCELLED: 'Cancelar venta',
-};
 
 interface SaleDetailDialogProps {
   saleId: number | null;
@@ -117,7 +110,7 @@ function SaleDetail({ sale }: { sale: SaleDetailResponse }) {
 
 function StatusActions({ sale }: { sale: SaleDetailResponse }) {
   const [note, setNote] = useState('');
-  const updateStatus = useUpdateSaleStatus();
+  const { change, confirmDialog, isPending, pendingStatus } = useSaleStatusChange();
   const nextStatuses = SALE_STATUS_TRANSITIONS[sale.status];
 
   if (nextStatuses.length === 0) {
@@ -128,9 +121,6 @@ function StatusActions({ sale }: { sale: SaleDetailResponse }) {
       </p>
     );
   }
-
-  const change = (status: SaleStatus) =>
-    updateStatus.mutate({ id: sale.id, data: { status, note: note.trim() || null } }, { onSuccess: () => setNote('') });
 
   return (
     <div className="grid gap-3 rounded-lg border p-4">
@@ -151,14 +141,15 @@ function StatusActions({ sale }: { sale: SaleDetailResponse }) {
             key={status}
             variant={status === 'CANCELLED' ? 'outline' : 'default'}
             className={status === 'CANCELLED' ? 'text-destructive hover:text-destructive' : undefined}
-            disabled={updateStatus.isPending}
-            onClick={() => change(status)}
+            disabled={isPending}
+            onClick={() => change(sale, status, { note: note.trim() || null, onDone: () => setNote('') })}
           >
-            {updateStatus.isPending && updateStatus.variables?.data.status === status && <Loader2 className="animate-spin" />}
-            {ACTION_LABELS[status]}
+            {isPending && pendingStatus === status && <Loader2 className="animate-spin" />}
+            {SALE_ACTION_LABELS[status]}
           </Button>
         ))}
       </div>
+      {confirmDialog}
     </div>
   );
 }

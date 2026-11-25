@@ -4,7 +4,8 @@ import type { Column } from '@/components/data-table/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { formatCurrency, formatDate, initials } from '@/lib/format';
 import type { SaleSortKey } from './api';
-import { PaymentStatusBadge, SaleStatusBadge } from './status-badges';
+import { SaleStatusMenu } from './sale-status-menu';
+import { PaymentStatusBadge } from './status-badges';
 
 export function getSaleColumns({ onView }: { onView: (sale: SaleResponse) => void }): Column<SaleResponse>[] {
   return [
@@ -38,7 +39,7 @@ export function getSaleColumns({ onView }: { onView: (sale: SaleResponse) => voi
     {
       id: 'status',
       header: 'Estado',
-      cell: (sale) => <SaleStatusBadge status={sale.status} />,
+      cell: (sale) => <SaleStatusMenu sale={sale} />,
     },
     {
       id: 'total',
