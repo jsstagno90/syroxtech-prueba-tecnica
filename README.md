@@ -12,8 +12,9 @@ Panel administrativo genérico y reutilizable para cualquier e-commerce. Esta de
 | --- | --- |
 | **Login** | Inicio de sesión con JWT guardado en cookie `httpOnly`, opción "Mantener sesión iniciada" y redirección automática si la sesión vence. |
 | **Inicio** | Ingresos, cantidad de ventas, ticket promedio, productos activos, ventas recientes, productos más vendidos y ventas por estado. Todo sale de la base de datos. |
-| **Categorías** | CRUD completo con subcategorías (padre/hija), posición, búsqueda, orden y paginación. No deja crear ciclos ni nombres repetidos en el mismo nivel, y tampoco borrar una categoría que tenga subcategorías o productos. |
+| **Categorías** | CRUD completo con subcategorías (padre/hija) que se despliegan en la misma tabla, posición, búsqueda, orden y paginación. No deja crear ciclos ni nombres repetidos en el mismo nivel, y tampoco borrar una categoría que tenga subcategorías o productos. |
 | **Productos** | CRUD con la misma estructura, alta y edición en una página propia (como en el diseño), filtros por categoría, marca y estado, imagen por URL con vista previa. Sin stock ni pasarela de pagos, como pide la consigna. |
+| **Importar productos** _(extra)_ | Carga masiva desde Excel o CSV en 3 pasos: subir el archivo (con plantilla descargable), **elegir qué columna del archivo corresponde a cada dato** (se propone sola según los encabezados, en cualquier orden) y revisar la validación fila por fila antes de confirmar. Si el SKU ya existe actualiza el producto, puede crear las marcas que falten y entiende precios como `150.000,50` o `$ 1.500`. |
 | **Ventas** | Botón **Generar venta**: un formulario con cliente, productos y cantidades que hace el `create` en la base. El total lo calcula la API con los precios guardados. Listado real con filtros, y una vista **Gestionar orden** con el detalle y el cambio de estado (Pendiente → En preparación → Enviado → Completado / Cancelado), que queda registrado en un historial. |
 | **Marcas** _(extra)_ | CRUD armado solo con los componentes genéricos, para mostrar lo que cuesta sumar una entidad nueva. |
 
@@ -117,7 +118,7 @@ Después entrar a http://localhost:3000 con `admin@demo.com` / `demo1234`. La do
 pnpm test
 ```
 
-Cubren las reglas de negocio más importantes: cálculo del total con precios de la base, rechazo de productos inexistentes o inactivos, flujo de estados de una venta, reembolso al cancelar, y en categorías la prevención de ciclos, los nombres duplicados y el bloqueo de borrado.
+Cubren las reglas de negocio más importantes: cálculo del total con precios de la base, rechazo de productos inexistentes o inactivos, flujo de estados de una venta, reembolso al cancelar; en categorías la prevención de ciclos, los nombres duplicados y el bloqueo de borrado; y en la importación la lectura de precios, la búsqueda de categorías por nombre o ruta y la detección automática de columnas.
 
 ## Posibles mejoras
 

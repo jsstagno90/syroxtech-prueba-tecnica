@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FilterX, Plus } from 'lucide-react';
+import { FileUp, FilterX, Plus } from 'lucide-react';
 import type { ProductResponse } from '@admin/shared';
 import { ConfirmDialog } from '@/components/crud/confirm-dialog';
 import { DataTable } from '@/components/data-table/data-table';
@@ -17,6 +17,7 @@ import { brandHooks } from '@/features/brands/api';
 import { buildCategoryPaths, categoryHooks } from '@/features/categories/api';
 import { productHooks, type ProductFilters, type ProductSortKey } from './api';
 import { getProductColumns } from './columns';
+import { ImportProductsDialog } from './import/import-products-dialog';
 
 const ALL = 'all';
 
@@ -25,6 +26,7 @@ export function ProductsPage() {
   const table = useTableState<ProductSortKey>();
   const crud = useCrudState<ProductResponse>();
   const [filters, setFilters] = useState<ProductFilters>({});
+  const [importOpen, setImportOpen] = useState(false);
   const list = productHooks.useList({ ...table.query, ...filters });
   const remove = productHooks.useRemove();
   const { data: categories = [] } = categoryHooks.useOptions();
@@ -49,11 +51,16 @@ export function ProductsPage() {
         title="Productos"
         description="Catálogo de la tienda: precios, categorías y estado de publicación."
         actions={
-          <Button asChild>
-            <Link href="/productos/nuevo">
-              <Plus /> Nuevo producto
-            </Link>
-          </Button>
+          <>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <FileUp /> Importar productos
+            </Button>
+            <Button asChild>
+              <Link href="/productos/nuevo">
+                <Plus /> Nuevo producto
+              </Link>
+            </Button>
+          </>
         }
       />
 
@@ -138,6 +145,8 @@ export function ProductsPage() {
           </div>
         }
       />
+
+      <ImportProductsDialog open={importOpen} onOpenChange={setImportOpen} />
 
       <ConfirmDialog
         open={!!crud.deleting}

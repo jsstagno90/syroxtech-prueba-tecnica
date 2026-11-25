@@ -5,3 +5,4 @@ export * from './brands.js';
 export * from './products.js';
 export * from './sales.js';
 export * from './dashboard.js';
+export * from './products-import.js';

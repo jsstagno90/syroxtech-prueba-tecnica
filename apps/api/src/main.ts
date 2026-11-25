@@ -8,6 +8,8 @@ import type { Env } from './config/env.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Margen para las importaciones de productos (hasta 1000 filas por request).
+  app.useBodyParser('json', { limit: '2mb' });
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
   app.setGlobalPrefix('api');
