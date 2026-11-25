@@ -5,11 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import type { CategorySortKey } from './api';
 
 interface CategoryColumnsOptions {
+  onView: (category: CategoryResponse) => void;
   onEdit: (category: CategoryResponse) => void;
   onDelete: (category: CategoryResponse) => void;
 }
 
-export function getCategoryColumns({ onEdit, onDelete }: CategoryColumnsOptions): Column<CategoryResponse>[] {
+export function getCategoryColumns({ onView, onEdit, onDelete }: CategoryColumnsOptions): Column<CategoryResponse>[] {
   return [
     {
       id: 'position',
@@ -50,7 +51,12 @@ export function getCategoryColumns({ onEdit, onDelete }: CategoryColumnsOptions)
       id: 'actions',
       header: <span className="sr-only">Acciones</span>,
       cell: (category) => (
-        <RowActions label={category.name} onEdit={() => onEdit(category)} onDelete={() => onDelete(category)} />
+        <RowActions
+          label={category.name}
+          onView={() => onView(category)}
+          onEdit={() => onEdit(category)}
+          onDelete={() => onDelete(category)}
+        />
       ),
       className: 'w-24',
     },

@@ -11,6 +11,7 @@ import {
 } from '@admin/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,12 +62,26 @@ function SaleDetail({ sale }: { sale: SaleDetailResponse }) {
         <Section icon={<CreditCard />} title="Pago">
           <InfoRow label="Método" value={PAYMENT_METHOD_LABELS[sale.paymentMethod]} />
           <InfoRow label="Estado" value={<PaymentStatusBadge status={sale.paymentStatus} />} />
+          {sale.discountCode && (
+            <>
+              <InfoRow label="Subtotal" value={formatCurrency(sale.subtotal)} />
+              <InfoRow
+                label={`Cupón ${sale.discountCode}`}
+                value={<span className="text-emerald-700 dark:text-emerald-400">− {formatCurrency(sale.discountAmount)}</span>}
+              />
+            </>
+          )}
           <InfoRow label="Total" value={<span className="text-base font-semibold">{formatCurrency(sale.total)}</span>} />
         </Section>
       </div>
 
       <Section icon={<MapPin />} title="Envío">
         <p className="text-sm">{sale.shippingAddress ?? 'Sin dirección de envío (retira en local).'}</p>
+        {sale.trackingNumber && (
+          <p className="mt-1 text-sm">
+            <span className="text-muted-foreground">Tracking:</span> <span className="font-mono">{sale.trackingNumber}</span>
+          </p>
+        )}
         {sale.notes && <p className="text-muted-foreground mt-1 text-sm">Nota: {sale.notes}</p>}
       </Section>
 
@@ -112,7 +127,10 @@ function SaleDetail({ sale }: { sale: SaleDetailResponse }) {
 
 function StatusActions({ sale }: { sale: SaleDetailResponse }) {
   const [note, setNote] = useState('');
+  const [tracking, setTracking] = useState(sale.trackingNumber ?? '');
   const { change, confirmDialog, isPending, pendingStatus } = useSaleStatusChange();
+  // Al despacharla se puede cargar el número de seguimiento del correo.
+  const canShip = sale.status === 'PREPARING';
   // Orden de los botones: deshacer, cancelar y la acción principal a la derecha.
   const rank = (status: SaleStatus) => (isSaleStatusRollback(sale.status, status) ? 0 : status === 'CANCELLED' ? 1 : 2);
   const nextStatuses = [...SALE_STATUS_TRANSITIONS[sale.status]].sort((a, b) => rank(a) - rank(b));
@@ -121,7 +139,7 @@ function StatusActions({ sale }: { sale: SaleDetailResponse }) {
     return (
       <p className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-lg p-3 text-sm">
         <CircleCheck className="size-4" />
-        Esta venta está cancelada: no admite más cambios de estado.
+        Esta venta no admite más cambios de estado.
       </p>
     );
   }
@@ -139,6 +157,18 @@ function StatusActions({ sale }: { sale: SaleDetailResponse }) {
           maxLength={500}
         />
       </div>
+      {canShip && (
+        <div className="grid gap-2 sm:max-w-sm">
+          <Label htmlFor="tracking-number">Número de seguimiento (opcional)</Label>
+          <Input
+            id="tracking-number"
+            value={tracking}
+            onChange={(event) => setTracking(event.target.value)}
+            placeholder="Ej: AND123456789"
+            maxLength={60}
+          />
+        </div>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
         {nextStatuses.map((status) => {
           const rollback = isSaleStatusRollback(sale.status, status);
@@ -148,7 +178,13 @@ function StatusActions({ sale }: { sale: SaleDetailResponse }) {
               variant={rollback ? 'ghost' : status === 'CANCELLED' ? 'outline' : 'default'}
               className={status === 'CANCELLED' ? 'text-destructive hover:text-destructive' : rollback ? 'sm:mr-auto' : undefined}
               disabled={isPending}
-              onClick={() => change(sale, status, { note: note.trim() || null, onDone: () => setNote('') })}
+              onClick={() =>
+                change(sale, status, {
+                  note: note.trim() || null,
+                  ...(status === 'SHIPPED' && { trackingNumber: tracking.trim() || null }),
+                  onDone: () => setNote(''),
+                })
+              }
             >
               {isPending && pendingStatus === status ? <Loader2 className="animate-spin" /> : rollback && <Undo2 />}
               {saleActionLabel(sale.status, status)}

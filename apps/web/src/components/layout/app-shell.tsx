@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useLocalStorageFlag } from '@/hooks/use-local-storage-flag';
 import { cn } from '@/lib/utils';
 import { AppHeader } from './app-header';
+import { useStoreName } from '@/features/settings/api';
 import { BrandLogo } from './brand-logo';
 import { SidebarNav } from './sidebar-nav';
 
@@ -15,6 +16,7 @@ const COLLAPSED_KEY = 'sidebar-collapsed';
 export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useLocalStorageFlag(COLLAPSED_KEY);
   const toggle = () => setCollapsed(!collapsed);
+  const storeName = useStoreName();
 
   return (
     <div className="flex min-h-screen">
@@ -25,7 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       >
         <div className={cn('flex h-14 items-center border-b px-3', collapsed && 'justify-center')}>
-          <BrandLogo collapsed={collapsed} />
+          <BrandLogo collapsed={collapsed} name={storeName} />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           <SidebarNav collapsed={collapsed} />

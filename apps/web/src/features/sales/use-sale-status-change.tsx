@@ -28,6 +28,13 @@ export function saleActionLabel(from: SaleStatus, to: SaleStatus): string {
 
 type SaleRef = Pick<SaleResponse, 'id' | 'orderNumber' | 'status' | 'paymentStatus'>;
 
+interface ChangeOptions {
+  note?: string | null;
+  /** Solo al pasar a Enviado. */
+  trackingNumber?: string | null;
+  onDone?: () => void;
+}
+
 interface PendingConfirm {
   sale: SaleRef;
   status: SaleStatus;
@@ -74,14 +81,15 @@ export function useSaleStatusChange() {
   const change = (
     sale: SaleRef,
     status: SaleStatus,
-    options: { note?: string | null; onDone?: () => void } = {},
+    options: ChangeOptions = {},
   ) => {
     const note = options.note ?? null;
     if (needsConfirmation(sale, status)) {
       setPending({ sale, status, note, onDone: options.onDone });
       return;
     }
-    updateStatus.mutate({ id: sale.id, data: { status, note } }, { onSuccess: options.onDone });
+    const data = { status, note, ...(options.trackingNumber !== undefined && { trackingNumber: options.trackingNumber }) };
+    updateStatus.mutate({ id: sale.id, data }, { onSuccess: options.onDone });
   };
 
   const copy = pending ? confirmCopy(pending) : null;

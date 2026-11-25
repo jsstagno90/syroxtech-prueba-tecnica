@@ -3,9 +3,17 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useWatch, type DefaultValues } from 'react-hook-form';
+import { Controller, useWatch, type DefaultValues } from 'react-hook-form';
 import { Loader2 } from 'lucide-react';
-import { createProductSchema, type CreateProductInput, type ProductResponse } from '@admin/shared';
+import {
+  PRODUCT_GENDERS,
+  PRODUCT_GENDER_LABELS,
+  createProductSchema,
+  type CreateProductInput,
+  type ProductResponse,
+  type ProductVariantInput,
+  type VariantOption,
+} from '@admin/shared';
 import { NumberField, SelectField, SwitchField, TextField, TextareaField } from '@/components/form/fields';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -15,17 +23,23 @@ import { applyServerErrors, useZodForm } from '@/hooks/use-zod-form';
 import { brandHooks } from '@/features/brands/api';
 import { buildCategoryPaths, categoryHooks } from '@/features/categories/api';
 import { productHooks } from './api';
-import { ProductThumb } from './product-thumb';
+import { ImageGalleryField } from './image-gallery-field';
+import { VariantOptionsEditor, VariantsTable, syncVariants } from './product-variants';
 
 // Precio y categoría arrancan vacíos a propósito: el schema obliga a completarlos.
 const EMPTY_PRODUCT: DefaultValues<CreateProductInput> = {
   name: '',
   description: '',
   sku: '',
-  imageUrl: '',
+  images: [],
+  gender: null,
   brandId: null,
   isActive: true,
+  options: [],
+  variants: [],
 };
+
+const GENDER_OPTIONS = PRODUCT_GENDERS.map((gender) => ({ value: gender, label: PRODUCT_GENDER_LABELS[gender] }));
 
 function toFormValues(product: ProductResponse): CreateProductInput {
   return {
@@ -33,10 +47,13 @@ function toFormValues(product: ProductResponse): CreateProductInput {
     description: product.description ?? '',
     price: product.price,
     sku: product.sku ?? '',
-    imageUrl: product.imageUrl ?? '',
+    images: product.images,
+    gender: product.gender,
     categoryId: product.category.id,
     brandId: product.brand?.id ?? null,
     isActive: product.isActive,
+    options: product.options,
+    variants: product.variants.map(({ options, sku, price, isActive }) => ({ options, sku: sku ?? '', price, isActive })),
   };
 }
 
@@ -48,8 +65,10 @@ export function ProductForm({ product }: { product?: ProductResponse }) {
   const update = productHooks.useUpdate();
   const { data: categories = [] } = categoryHooks.useOptions();
   const { data: brands = [] } = brandHooks.useOptions();
-  const imageUrl = useWatch({ control: form.control, name: 'imageUrl' });
-  const name = useWatch({ control: form.control, name: 'name' });
+  const options = (useWatch({ control: form.control, name: 'options' }) ?? []) as VariantOption[];
+  const variantsCount = useWatch({ control: form.control, name: 'variants' })?.length ?? 0;
+  const price = useWatch({ control: form.control, name: 'price' });
+  const errors = form.formState.errors;
 
   const categoryOptions = useMemo(
     () => buildCategoryPaths(categories).map((category) => ({ value: category.id, label: category.path })),
@@ -84,7 +103,7 @@ export function ProductForm({ product }: { product?: ProductResponse }) {
             </Button>
             <Button type="submit" disabled={submitting}>
               {submitting && <Loader2 className="animate-spin" />}
-              {product ? 'Guardar cambios' : 'Crear producto'}
+              {product ? 'Guardar cambios' : variantsCount ? 'Crear producto con variantes' : 'Crear producto'}
             </Button>
           </>
         }
@@ -105,6 +124,15 @@ export function ProductForm({ product }: { product?: ProductResponse }) {
                 label="Descripción"
                 placeholder="Descripción detallada del producto"
                 rows={4}
+              />
+              <SelectField
+                control={form.control}
+                name="gender"
+                label="Género"
+                placeholder="Seleccioná un género"
+                noneLabel="Sin especificar"
+                options={GENDER_OPTIONS}
+                className="sm:max-w-xs"
               />
             </CardContent>
           </Card>
@@ -134,24 +162,71 @@ export function ProductForm({ product }: { product?: ProductResponse }) {
               />
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Opciones del producto</CardTitle>
+              <CardDescription>Definí las características que tienen variaciones (ej: Color, Talla, Material).</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Controller
+                control={form.control}
+                name="options"
+                render={({ field }) => (
+                  <VariantOptionsEditor
+                    value={(field.value ?? []) as VariantOption[]}
+                    errors={errors.options as never}
+                    onChange={(next) => {
+                      field.onChange(next);
+                      // Cada cambio en las opciones vuelve a armar las combinaciones.
+                      form.setValue('variants', syncVariants(next, (form.getValues('variants') ?? []) as ProductVariantInput[]), {
+                        shouldValidate: form.formState.isSubmitted,
+                      });
+                    }}
+                  />
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Variantes del producto</CardTitle>
+              <CardDescription>Se generan solas con las opciones. Cargá SKU o un precio distinto si hace falta.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Controller
+                control={form.control}
+                name="variants"
+                render={({ field, fieldState }) => (
+                  <VariantsTable
+                    options={options}
+                    value={(field.value ?? []) as ProductVariantInput[]}
+                    onChange={field.onChange}
+                    basePrice={typeof price === 'number' ? price : undefined}
+                    errors={errors.variants as never}
+                    rootError={fieldState.error?.message ?? errors.variants?.root?.message}
+                  />
+                )}
+              />
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid content-start gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Imagen</CardTitle>
-              <CardDescription>Pegá la URL de una imagen pública.</CardDescription>
+              <CardTitle>Imágenes del producto</CardTitle>
+              <CardDescription>La primera es la principal: se usa en el listado y en las ventas.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="bg-muted/40 grid aspect-square place-items-center overflow-hidden rounded-lg border">
-                <ProductThumb
-                  key={imageUrl ?? ''}
-                  src={imageUrl || null}
-                  alt={name || 'Vista previa'}
-                  className="size-full rounded-none border-0 [&_svg]:size-8"
-                />
-              </div>
-              <TextField control={form.control} name="imageUrl" label="URL de la imagen" placeholder="https://..." type="url" />
+            <CardContent>
+              <Controller
+                control={form.control}
+                name="images"
+                render={({ field, fieldState }) => (
+                  <ImageGalleryField value={(field.value ?? []) as string[]} onChange={field.onChange} error={fieldState.error?.message} />
+                )}
+              />
             </CardContent>
           </Card>
 

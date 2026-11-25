@@ -8,10 +8,12 @@ import {
   PAYMENT_METHOD_LABELS,
   calculateSaleTotals,
   createSaleSchema,
+  formatDiscountValue,
   type CreateSaleDto,
   type CreateSaleInput,
   type ProductOption,
 } from '@admin/shared';
+import { discountHooks } from '@/features/discounts/api';
 import { FormDialog } from '@/components/crud/form-dialog';
 import { NumberField, SelectField, TextField, TextareaField } from '@/components/form/fields';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,7 @@ const DEFAULT_VALUES: CreateSaleInput = {
   paymentMethod: 'CARD',
   paymentStatus: 'PAID',
   notes: '',
+  discountCode: null,
   items: [emptyItem()],
 };
 
@@ -88,8 +91,72 @@ function SaleFormFields({ form }: { form: SaleForm }) {
       <section className="grid gap-4 sm:grid-cols-2">
         <SelectField control={form.control} name="paymentMethod" label="Medio de pago" options={paymentMethodOptions} required />
         <SelectField control={form.control} name="paymentStatus" label="Estado del pago" options={paymentStatusOptions} required />
-        <TextareaField control={form.control} name="notes" label="Notas" placeholder="Opcional" className="sm:col-span-2" rows={2} />
+        <CouponField form={form} />
+        <TextareaField control={form.control} name="notes" label="Notas" placeholder="Opcional" rows={2} />
       </section>
+
+      <SaleTotals form={form} />
+    </div>
+  );
+}
+
+/** Cupones vigentes. La API vuelve a validar al guardar (vigencia, mínimo y usos). */
+function CouponField({ form }: { form: SaleForm }) {
+  const { data: coupons = [] } = discountHooks.useOptions();
+  return (
+    <SelectField
+      control={form.control}
+      name="discountCode"
+      label="Cupón de descuento"
+      placeholder={coupons.length ? 'Sin cupón' : 'No hay cupones vigentes'}
+      noneLabel="Sin cupón"
+      disabled={!coupons.length}
+      options={coupons.map((coupon) => ({
+        value: coupon.code,
+        label: `${coupon.code} · ${formatDiscountValue(coupon, formatCurrency)}${coupon.minPurchase ? ` (mín. ${formatCurrency(coupon.minPurchase)})` : ''}`,
+      }))}
+    />
+  );
+}
+
+/** Vista previa de subtotal, descuento y total con los precios actuales. */
+function SaleTotals({ form }: { form: SaleForm }) {
+  const [items, discountCode] = useWatch({ control: form.control, name: ['items', 'discountCode'] });
+  const { data: products = [] } = productHooks.useOptions();
+  const { data: coupons = [] } = discountHooks.useOptions();
+  const coupon = coupons.find((item) => item.code === discountCode) ?? null;
+
+  const lines = (items ?? []).map((item) => ({
+    unitPrice: products.find((product) => product.id === item?.productId)?.price ?? 0,
+    quantity: Number.isFinite(item?.quantity) ? item.quantity : 0,
+  }));
+  const base = calculateSaleTotals(lines);
+  const belowMinimum = !!coupon?.minPurchase && base.subtotal < coupon.minPurchase;
+  const preview = calculateSaleTotals(lines, belowMinimum ? null : coupon);
+
+  return (
+    <div className="bg-muted/50 grid gap-1.5 rounded-lg px-4 py-3">
+      {coupon && (
+        <>
+          <div className="text-muted-foreground flex justify-between text-sm">
+            <span>Subtotal</span>
+            <span className="tabular-nums">{formatCurrency(preview.subtotal)}</span>
+          </div>
+          <div className="flex justify-between text-sm text-emerald-700 dark:text-emerald-400">
+            <span>Cupón {coupon.code}</span>
+            <span className="tabular-nums">− {formatCurrency(preview.discountAmount)}</span>
+          </div>
+        </>
+      )}
+      {belowMinimum && (
+        <p role="alert" className="text-xs text-amber-700 dark:text-amber-400">
+          El cupón {coupon!.code} pide una compra mínima de {formatCurrency(coupon!.minPurchase!)}: así no se va a poder aplicar.
+        </p>
+      )}
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground text-sm">Total estimado</span>
+        <span className="text-lg font-semibold tabular-nums">{formatCurrency(preview.total)}</span>
+      </div>
     </div>
   );
 }
@@ -176,11 +243,6 @@ function SaleItemsFields({ form }: { form: SaleForm }) {
           {itemsError}
         </p>
       )}
-
-      <div className="bg-muted/50 flex items-center justify-between rounded-lg px-4 py-3">
-        <span className="text-muted-foreground text-sm">Total estimado</span>
-        <span className="text-lg font-semibold tabular-nums">{formatCurrency(preview.total)}</span>
-      </div>
     </section>
   );
 }

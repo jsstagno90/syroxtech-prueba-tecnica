@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type {
   BulkDeleteProductsDto,
   BulkProductsResult,
@@ -9,6 +9,7 @@ import type {
   ProductOption,
   ProductResponse,
   UpdateProductDto,
+  VariantOption,
 } from '@admin/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { toNumber } from '../common/http/decimal.js';
@@ -18,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 const productInclude = {
   category: { select: { id: true, name: true } },
   brand: { select: { id: true, name: true } },
+  variants: { orderBy: { position: 'asc' } },
 } satisfies Prisma.ProductInclude;
 
 type ProductWithRelations = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
@@ -58,14 +60,29 @@ export class ProductsService {
 
   async create(dto: CreateProductDto): Promise<ProductResponse> {
     await this.assertRelationsExist(dto.categoryId, dto.brandId);
-    const product = await this.prisma.product.create({ data: dto, include: productInclude });
+    await this.assertVariantSkusFree(dto.variants);
+    const { data, variants } = toProductData(dto);
+    const product = await this.prisma.product.create({
+      data: { ...(data as Prisma.ProductUncheckedCreateInput), variants: { create: toVariantRows(variants ?? []) } },
+      include: productInclude,
+    });
     return toProductResponse(product);
   }
 
+  /** Si vienen variantes se reemplazan todas (las ventas no las referencian, así que no se pierde nada). */
   async update(id: number, dto: UpdateProductDto): Promise<ProductResponse> {
     await this.getOrThrow(id);
     await this.assertRelationsExist(dto.categoryId, dto.brandId);
-    const product = await this.prisma.product.update({ where: { id }, data: dto, include: productInclude });
+    await this.assertVariantSkusFree(dto.variants, id);
+    const { data, variants } = toProductData(dto);
+    const product = await this.prisma.$transaction(async (tx) => {
+      if (variants) await tx.productVariant.deleteMany({ where: { productId: id } });
+      return tx.product.update({
+        where: { id },
+        data: { ...data, ...(variants && { variants: { create: toVariantRows(variants) } }) },
+        include: productInclude,
+      });
+    });
     return toProductResponse(product);
   }
 
@@ -107,6 +124,17 @@ export class ProductsService {
     return product;
   }
 
+  /** Un SKU de variante no puede estar usado por la variante de otro producto. */
+  private async assertVariantSkusFree(variants: UpdateProductDto['variants'], productId?: number) {
+    const skus = (variants ?? []).map((variant) => variant.sku).filter((sku): sku is string => !!sku);
+    if (!skus.length) return;
+    const taken = await this.prisma.productVariant.findFirst({
+      where: { sku: { in: skus }, ...(productId && { productId: { not: productId } }) },
+      select: { sku: true, product: { select: { name: true } } },
+    });
+    if (taken) throw new ConflictException(`El SKU ${taken.sku} ya lo usa una variante de "${taken.product.name}"`);
+  }
+
   private async assertRelationsExist(categoryId?: number, brandId?: number | null) {
     if (categoryId !== undefined) {
       const category = await this.prisma.category.count({ where: { id: categoryId } });
@@ -141,6 +169,34 @@ function buildFilters(query: ProductListQuery): Prisma.ProductWhereInput[] {
   return filters;
 }
 
+/**
+ * Separa las variantes (relación) del resto y mantiene `imageUrl` y `images` en sintonía:
+ * la imagen principal siempre es la primera de la galería.
+ */
+function toProductData(dto: CreateProductDto | UpdateProductDto) {
+  const { variants, options, images, imageUrl, ...rest } = dto;
+  const data: Prisma.ProductUncheckedUpdateInput = { ...rest };
+  if (images !== undefined) {
+    data.images = images;
+    data.imageUrl = images[0] ?? null;
+  } else if (imageUrl !== undefined) {
+    data.imageUrl = imageUrl;
+    data.images = imageUrl ? [imageUrl] : [];
+  }
+  if (options !== undefined) data.options = options;
+  return { data, variants };
+}
+
+function toVariantRows(variants: NonNullable<UpdateProductDto['variants']>) {
+  return variants.map((variant, position) => ({
+    options: variant.options,
+    sku: variant.sku,
+    price: variant.price,
+    isActive: variant.isActive,
+    position,
+  }));
+}
+
 function toProductResponse(product: ProductWithRelations): ProductResponse {
   return {
     id: product.id,
@@ -149,9 +205,19 @@ function toProductResponse(product: ProductWithRelations): ProductResponse {
     price: toNumber(product.price),
     sku: product.sku,
     imageUrl: product.imageUrl,
+    images: product.images.length ? product.images : product.imageUrl ? [product.imageUrl] : [],
+    gender: product.gender,
     isActive: product.isActive,
     category: product.category,
     brand: product.brand,
+    options: product.options as unknown as VariantOption[],
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      options: variant.options as Record<string, string>,
+      sku: variant.sku,
+      price: variant.price === null ? null : toNumber(variant.price),
+      isActive: variant.isActive,
+    })),
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
   };

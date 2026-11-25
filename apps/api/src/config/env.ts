@@ -6,6 +6,8 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL es obligatoria'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET tiene que tener al menos 32 caracteres'),
+  /** URL pública de la API (para armar los links de las imágenes subidas). Si falta, se toma del request. */
+  PUBLIC_URL: z.url().optional(),
   CORS_ORIGINS: z
     .string()
     .default('http://localhost:3000')

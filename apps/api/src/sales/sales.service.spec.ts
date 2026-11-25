@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { calculateSaleTotals, type CreateSaleDto } from '@admin/shared';
 import { Prisma } from '../generated/prisma/client.js';
+import type { DiscountsService } from '../discounts/discounts.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
 import { SalesService, generateOrderNumber } from './sales.service.js';
 
@@ -14,6 +15,7 @@ const baseSale: CreateSaleDto = {
   paymentMethod: 'CARD',
   paymentStatus: 'PAID',
   notes: null,
+  discountCode: null,
   items: [
     { productId: 1, quantity: 2 },
     { productId: 2, quantity: 1 },
@@ -40,6 +42,10 @@ function fakeSaleRow(overrides: Record<string, unknown> = {}) {
     paymentStatus: 'PAID',
     status: 'PENDING',
     notes: null,
+    trackingNumber: null,
+    subtotal: new Prisma.Decimal(0),
+    discountCode: null,
+    discountAmount: new Prisma.Decimal(0),
     total: new Prisma.Decimal(0),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -70,10 +76,12 @@ describe('generateOrderNumber', () => {
 describe('SalesService', () => {
   let prisma: ReturnType<typeof createPrismaMock>;
   let service: SalesService;
+  const discounts = { resolveForSale: vi.fn() };
 
   beforeEach(() => {
     prisma = createPrismaMock();
-    service = new SalesService(prisma as unknown as PrismaService);
+    discounts.resolveForSale.mockReset();
+    service = new SalesService(prisma as unknown as PrismaService, discounts as unknown as DiscountsService);
   });
 
   describe('create', () => {
@@ -94,6 +102,31 @@ describe('SalesService', () => {
         expect.objectContaining({ productName: 'Zapatilla B', unitPrice: 250, quantity: 1, subtotal: 250 }),
       ]);
       expect(data.history.create).toMatchObject({ status: 'PENDING', createdBy: 'Administrador' });
+    });
+
+    it('aplica el cupón sobre el subtotal calculado en la API', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        { id: 1, name: 'Zapatilla A', price: new Prisma.Decimal('1000'), isActive: true },
+        { id: 2, name: 'Zapatilla B', price: new Prisma.Decimal('500'), isActive: true },
+      ]);
+      discounts.resolveForSale.mockResolvedValue({ id: 3, code: 'BIENVENIDA10', type: 'PERCENTAGE', value: 10 });
+      prisma.sale.create.mockResolvedValue(fakeSaleRow());
+
+      await service.create({ ...baseSale, discountCode: 'BIENVENIDA10' }, user);
+
+      expect(discounts.resolveForSale).toHaveBeenCalledWith('BIENVENIDA10', 2500);
+      const { data } = prisma.sale.create.mock.calls[0]![0];
+      expect(data).toMatchObject({ subtotal: 2500, discountAmount: 250, total: 2250, discountCode: 'BIENVENIDA10' });
+    });
+
+    it('si el cupón no sirve no guarda la venta', async () => {
+      prisma.product.findMany.mockResolvedValue([
+        { id: 1, name: 'Zapatilla A', price: new Prisma.Decimal('100'), isActive: true },
+        { id: 2, name: 'Zapatilla B', price: new Prisma.Decimal('100'), isActive: true },
+      ]);
+      discounts.resolveForSale.mockRejectedValue(new BadRequestException('El cupón VERANO no se puede usar: está vencido'));
+      await expect(service.create({ ...baseSale, discountCode: 'VERANO' }, user)).rejects.toThrow(/vencido/);
+      expect(prisma.sale.create).not.toHaveBeenCalled();
     });
 
     it('rechaza productos que no existen', async () => {

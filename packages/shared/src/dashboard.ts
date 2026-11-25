@@ -16,7 +16,25 @@ export interface SalesByDay {
   revenue: number;
 }
 
+export interface CatalogProduct {
+  id: number;
+  name: string;
+  price: number;
+  imageUrl: string | null;
+  isActive: boolean;
+  variantsCount: number;
+}
+
 export interface DashboardSummary {
+  /** Tarjeta de catálogo (en lugar del inventario del diseño, que pedía stock). */
+  catalog: {
+    total: number;
+    active: number;
+    variants: number;
+    /** Suma de precios de los productos activos. */
+    value: number;
+    latest: CatalogProduct[];
+  };
   products: { total: number; active: number };
   categories: number;
   brands: number;

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createListQuerySchema, optionalText } from './common.js';
+import { calculateDiscountAmount, type DiscountResponse } from './discounts.js';
 
 /* ----------------------------- Estados ------------------------------ */
 
@@ -79,14 +80,19 @@ export interface SaleLineInput {
  * errores de coma flotante (0.1 + 0.2). La usa la API para guardar
  * la venta y el panel para mostrar el total antes de confirmar.
  */
-export function calculateSaleTotals<T extends SaleLineInput>(lines: readonly T[]) {
+export function calculateSaleTotals<T extends SaleLineInput>(
+  lines: readonly T[],
+  discount?: Pick<DiscountResponse, 'type' | 'value'> | null,
+) {
   const toCents = (value: number) => Math.round(value * 100);
   const detailed = lines.map((line) => ({
     ...line,
     subtotal: (toCents(line.unitPrice) * line.quantity) / 100,
   }));
-  const totalCents = lines.reduce((acc, line) => acc + toCents(line.unitPrice) * line.quantity, 0);
-  return { lines: detailed, total: totalCents / 100 };
+  const subtotalCents = lines.reduce((acc, line) => acc + toCents(line.unitPrice) * line.quantity, 0);
+  const subtotal = subtotalCents / 100;
+  const discountAmount = discount ? calculateDiscountAmount(subtotal, discount) : 0;
+  return { lines: detailed, subtotal, discountAmount, total: (subtotalCents - toCents(discountAmount)) / 100 };
 }
 
 /* ----------------------------- Schemas ------------------------------ */
@@ -109,6 +115,15 @@ export const createSaleSchema = z
     paymentMethod: z.enum(PAYMENT_METHODS),
     paymentStatus: z.enum(['PENDING', 'PAID']).default('PAID'),
     notes: optionalText(500).default(null),
+    /** Código de cupón (opcional). La API valida que esté vigente y calcula el descuento. */
+    discountCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .max(20)
+      .nullable()
+      .optional()
+      .transform((value) => value || null),
     items: z.array(saleItemSchema).min(1, 'Agregá al menos un producto').max(50),
   })
   .superRefine((sale, ctx) => {
@@ -125,6 +140,8 @@ export const createSaleSchema = z
 export const updateSaleStatusSchema = z.object({
   status: z.enum(SALE_STATUSES),
   note: optionalText(500).default(null),
+  /** Número de seguimiento del envío. Si no viene, no se toca. */
+  trackingNumber: optionalText(60).optional(),
 });
 
 export const saleListQuerySchema = createListQuerySchema(['createdAt', 'total', 'customerName'] as const).extend({
@@ -165,10 +182,14 @@ export interface SaleResponse {
   customerEmail: string;
   customerPhone: string | null;
   shippingAddress: string | null;
+  trackingNumber: string | null;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   status: SaleStatus;
   notes: string | null;
+  subtotal: number;
+  discountCode: string | null;
+  discountAmount: number;
   total: number;
   itemsCount: number;
   createdAt: string;

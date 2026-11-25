@@ -41,6 +41,19 @@ export function getProductColumns({ onEdit, onDelete }: ProductColumnsOptions): 
       cell: (product) => product.brand?.name ?? <span className="text-muted-foreground">Sin marca</span>,
     },
     {
+      id: 'variants',
+      header: 'Variantes',
+      cell: (product) =>
+        product.variants.length ? (
+          <span className="text-sm" title={product.options.map((option) => option.name).join(' · ')}>
+            {product.variants.length}{' '}
+            <span className="text-muted-foreground text-xs">({product.options.map((option) => option.name).join(', ')})</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       id: 'price',
       header: 'Precio',
       sortKey: 'price' satisfies ProductSortKey,

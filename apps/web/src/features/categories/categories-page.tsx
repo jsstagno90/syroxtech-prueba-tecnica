@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { CategoryResponse } from '@admin/shared';
 import { ConfirmDialog } from '@/components/crud/confirm-dialog';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useCrudState } from '@/hooks/use-crud-state';
 import { useTableState } from '@/hooks/use-table-state';
 import { categoryHooks, type CategorySortKey } from './api';
+import { CategoryDetailDialog } from './category-detail-dialog';
 import { CategoryFormDialog } from './category-form-dialog';
 import { getCategoryColumns } from './columns';
 import { SubcategoryRows } from './subcategory-rows';
@@ -24,7 +25,11 @@ export function CategoriesPage() {
   const remove = categoryHooks.useRemove();
 
   const { openEdit, askDelete } = crud;
-  const columns = useMemo(() => getCategoryColumns({ onEdit: openEdit, onDelete: askDelete }), [openEdit, askDelete]);
+  const [viewing, setViewing] = useState<CategoryResponse | null>(null);
+  const columns = useMemo(
+    () => getCategoryColumns({ onView: setViewing, onEdit: openEdit, onDelete: askDelete }),
+    [openEdit, askDelete],
+  );
 
   return (
     <>
@@ -62,6 +67,7 @@ export function CategoriesPage() {
         }
       />
 
+      <CategoryDetailDialog category={viewing} onOpenChange={(open) => !open && setViewing(null)} onEdit={openEdit} />
       <CategoryFormDialog open={crud.formOpen} onOpenChange={crud.setFormOpen} category={crud.editing} />
 
       <ConfirmDialog

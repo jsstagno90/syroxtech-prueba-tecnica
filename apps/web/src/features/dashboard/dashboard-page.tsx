@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, DollarSign, Package, Receipt, ShoppingCart, TrendingUp } from 'lucide-react';
-import type { ComponentType, ReactNode } from 'react';
+import { ArrowRight, DollarSign, Package, Plus, Receipt, ShoppingCart, TrendingUp } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { SALE_STATUSES, SALE_STATUS_LABELS, type DashboardSummary, type SaleStatus } from '@admin/shared';
+import { StatCard } from '@/components/data-display/stat-card';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,8 +66,10 @@ export function DashboardPage() {
 
           <SalesChart data={data.salesByDay} />
 
-          <div className="grid gap-6 lg:grid-cols-5">
-            <Card className="lg:col-span-3">
+          <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <CatalogCard catalog={data.catalog} />
+
+            <Card>
               <CardHeader>
                 <CardTitle>Ventas recientes</CardTitle>
                 <CardDescription>Las últimas 5 ventas registradas.</CardDescription>
@@ -104,7 +107,7 @@ export function DashboardPage() {
               </CardContent>
             </Card>
 
-            <div className="grid content-start gap-6 lg:col-span-2">
+            <div className="grid content-start gap-6 lg:col-span-2 xl:col-span-1">
               <Card>
                 <CardHeader>
                   <CardTitle>Productos más vendidos</CardTitle>
@@ -148,28 +151,53 @@ export function DashboardPage() {
   );
 }
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  hint: string;
-}) {
+/** En el diseño es "Inventario"; como la consigna excluye stock, muestra el catálogo y su valor. */
+function CatalogCard({ catalog }: { catalog: DashboardSummary['catalog'] }) {
+  const rest = catalog.total - catalog.latest.length;
   return (
-    <Card className="gap-2 py-5">
-      <CardHeader className="px-5">
-        <CardDescription className="flex items-center justify-between">
-          {label}
-          <Icon className="size-4" />
-        </CardDescription>
+    <Card>
+      <CardHeader>
+        <CardTitle>Catálogo de productos</CardTitle>
+        <CardAction>
+          <Package className="text-muted-foreground size-4" />
+        </CardAction>
       </CardHeader>
-      <CardContent className="px-5">
-        <p className="text-2xl font-bold tracking-tight tabular-nums">{value}</p>
-        <p className="text-muted-foreground mt-1 text-xs">{hint}</p>
+      <CardContent className="grid gap-4">
+        <div>
+          <p className="text-3xl font-bold tracking-tight tabular-nums">{formatNumber(catalog.total)}</p>
+          <p className="text-muted-foreground text-xs">
+            Productos en catálogo · {formatNumber(catalog.active)} activos · {formatNumber(catalog.variants)} variantes
+          </p>
+          <p className="mt-2 text-sm font-medium">Valor: {formatCurrency(catalog.value)}</p>
+          <p className="text-muted-foreground text-xs">Suma de precios de los productos activos</p>
+        </div>
+        {catalog.latest.length === 0 ? (
+          <EmptyMessage>Todavía no hay productos.</EmptyMessage>
+        ) : (
+          <ul className="grid gap-2 text-sm">
+            {catalog.latest.map((product) => (
+              <li key={product.id} className="flex items-center justify-between gap-3">
+                <Link href={`/productos/${product.id}`} className="min-w-0 truncate hover:underline">
+                  {product.name}
+                </Link>
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {product.variantsCount > 0 ? `${product.variantsCount} var.` : !product.isActive ? 'Inactivo' : formatCurrency(product.price)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {rest > 0 && <p className="text-muted-foreground text-center text-xs">+{formatNumber(rest)} productos más</p>}
+        <div className="flex justify-between gap-2 border-t pt-4">
+          <Button size="sm" asChild>
+            <Link href="/productos/nuevo">
+              <Plus /> Añadir
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/productos">Ver todos</Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -218,9 +246,10 @@ function DashboardSkeleton() {
           <Skeleton key={index} className="h-28 rounded-xl" />
         ))}
       </div>
-      <div className="grid gap-6 lg:grid-cols-5">
-        <Skeleton className="h-96 rounded-xl lg:col-span-3" />
-        <Skeleton className="h-96 rounded-xl lg:col-span-2" />
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Skeleton className="h-96 rounded-xl" />
+        <Skeleton className="h-96 rounded-xl" />
+        <Skeleton className="h-96 rounded-xl" />
       </div>
     </div>
   );

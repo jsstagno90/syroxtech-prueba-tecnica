@@ -1,4 +1,19 @@
-import { FolderTree, Home, Package, ShoppingCart, Tag, type LucideIcon } from 'lucide-react';
+import {
+  BadgePercent,
+  BarChart3,
+  Bell,
+  CircleHelp,
+  Crown,
+  FolderTree,
+  Gift,
+  Home,
+  Package,
+  Settings,
+  ShoppingCart,
+  Tag,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 
 export interface NavItem {
   title: string;
@@ -18,6 +33,8 @@ export const navigation: NavGroup[] = [
     items: [
       { title: 'Inicio', href: '/', icon: Home },
       { title: 'Ventas', href: '/ventas', icon: ShoppingCart },
+      { title: 'Clientes', href: '/clientes', icon: Users },
+      { title: 'Estadísticas', href: '/estadisticas', icon: BarChart3 },
     ],
   },
   {
@@ -26,6 +43,22 @@ export const navigation: NavGroup[] = [
       { title: 'Productos', href: '/productos', icon: Package },
       { title: 'Categorías', href: '/categorias', icon: FolderTree },
       { title: 'Marcas', href: '/marcas', icon: Tag },
+    ],
+  },
+  {
+    label: 'Fidelización',
+    items: [
+      { title: 'Descuentos', href: '/descuentos', icon: BadgePercent },
+      { title: 'Puntos de lealtad', href: '/lealtad', icon: Gift },
+      { title: 'Membresías', href: '/membresias', icon: Crown },
+    ],
+  },
+  {
+    label: 'Sistema',
+    items: [
+      { title: 'Notificaciones', href: '/notificaciones', icon: Bell },
+      { title: 'Configuración', href: '/configuracion', icon: Settings },
+      { title: 'Ayuda', href: '/ayuda', icon: CircleHelp },
     ],
   },
 ];

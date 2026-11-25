@@ -31,9 +31,12 @@ export const salesApi = {
     apiClient.patch<SaleDetailResponse>(`sales/${id}/status`, data),
 };
 
+/** Todo lo que se calcula a partir de las ventas y queda viejo cuando cambia una. */
+const DERIVED_FROM_SALES = ['dashboard', 'customers', 'loyalty', 'memberships', 'notifications', 'stats', 'discounts'];
+
 export const saleHooks = createResourceHooks(salesApi, {
   key: 'sales',
-  invalidates: ['dashboard'],
+  invalidates: DERIVED_FROM_SALES,
   messages: { created: 'Venta generada', updated: 'Venta actualizada', deleted: 'Venta eliminada' },
 });
 
@@ -52,10 +55,9 @@ export function useUpdateSaleStatus() {
     mutationFn: ({ id, data }: { id: number; data: UpdateSaleStatusDto }) => salesApi.updateStatus(id, data),
     onSuccess: async (sale) => {
       queryClient.setQueryData(saleHooks.keys.detail(sale.id), sale);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: saleHooks.keys.all }),
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-      ]);
+      await Promise.all(
+        [...saleHooks.keys.all, ...DERIVED_FROM_SALES].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
+      );
       toast.success(`Venta #${sale.orderNumber}: ${SALE_STATUS_LABELS[sale.status]}`);
     },
     onError: (error) => toast.error(error.message),

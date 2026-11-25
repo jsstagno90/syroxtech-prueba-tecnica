@@ -3,6 +3,7 @@ import { SALE_STATUSES, type DashboardSummary, type SaleStatus, type SalesByDay 
 import type { Prisma } from '../generated/prisma/client.js';
 import { toNumber } from '../common/http/decimal.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { toSaleResponse } from '../sales/sales.service.js';
 
 /** Zona horaria de la tienda: define a qué día pertenece cada venta. */
 const STORE_TIME_ZONE = 'America/Argentina/Buenos_Aires';
@@ -27,6 +28,9 @@ export class DashboardService {
       recentSales,
       topProducts,
       salesByDay,
+      variantsCount,
+      catalogValue,
+      latestProducts,
     ] = await Promise.all([
       this.prisma.product.count(),
       this.prisma.product.count({ where: { isActive: true } }),
@@ -48,6 +52,13 @@ export class DashboardService {
         take: 5,
       }),
       this.getSalesByDay(),
+      this.prisma.productVariant.count(),
+      this.prisma.product.aggregate({ where: { isActive: true }, _sum: { price: true } }),
+      this.prisma.product.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+        select: { id: true, name: true, price: true, imageUrl: true, isActive: true, _count: { select: { variants: true } } },
+      }),
     ]);
 
     const revenueTotal = toNumber(revenue._sum.total ?? 0);
@@ -55,6 +66,17 @@ export class DashboardService {
     for (const row of salesByStatus) byStatus[row.status] = row._count;
 
     return {
+      catalog: {
+        total: productsTotal,
+        active: productsActive,
+        variants: variantsCount,
+        value: toNumber(catalogValue._sum.price ?? 0),
+        latest: latestProducts.map(({ _count, price, ...product }) => ({
+          ...product,
+          price: toNumber(price),
+          variantsCount: _count.variants,
+        })),
+      },
       products: { total: productsTotal, active: productsActive },
       categories,
       brands,
@@ -64,22 +86,7 @@ export class DashboardService {
         averageTicket: revenue._count ? Math.round((revenueTotal / revenue._count) * 100) / 100 : 0,
         byStatus,
       },
-      recentSales: recentSales.map((sale) => ({
-        id: sale.id,
-        orderNumber: sale.orderNumber,
-        customerName: sale.customerName,
-        customerEmail: sale.customerEmail,
-        customerPhone: sale.customerPhone,
-        shippingAddress: sale.shippingAddress,
-        paymentMethod: sale.paymentMethod,
-        paymentStatus: sale.paymentStatus,
-        status: sale.status,
-        notes: sale.notes,
-        total: toNumber(sale.total),
-        itemsCount: sale._count.items,
-        createdAt: sale.createdAt.toISOString(),
-        updatedAt: sale.updatedAt.toISOString(),
-      })),
+      recentSales: recentSales.map(toSaleResponse),
       topProducts: topProducts.map((row) => ({
         productId: row.productId,
         productName: row.productName,

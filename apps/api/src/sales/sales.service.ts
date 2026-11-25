@@ -15,6 +15,7 @@ import {
 import { Prisma } from '../generated/prisma/client.js';
 import { toNumber } from '../common/http/decimal.js';
 import { paginate, toPrismaPage } from '../common/http/pagination.js';
+import { DiscountsService } from '../discounts/discounts.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const saleListInclude = { _count: { select: { items: true } } } satisfies Prisma.SaleInclude;
@@ -31,7 +32,10 @@ const ORDER_NUMBER_ATTEMPTS = 3;
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly discounts: DiscountsService,
+  ) {}
 
   async findAll(query: SaleListQuery): Promise<PaginatedResponse<SaleResponse>> {
     const filters: Prisma.SaleWhereInput[] = [];
@@ -89,17 +93,23 @@ export class SalesService {
       throw new BadRequestException(`No se pueden vender productos inactivos: ${inactive.map((p) => p.name).join(', ')}`);
     }
 
-    const { lines, total } = calculateSaleTotals(
-      dto.items.map((item) => {
-        const product = byId.get(item.productId)!;
-        return { product, quantity: item.quantity, unitPrice: toNumber(product.price) };
-      }),
-    );
+    const saleLines = dto.items.map((item) => {
+      const product = byId.get(item.productId)!;
+      return { product, quantity: item.quantity, unitPrice: toNumber(product.price) };
+    });
+    // El cupón se valida contra el subtotal real (precios de la base) y el descuento lo calcula la API.
+    const discount = dto.discountCode
+      ? await this.discounts.resolveForSale(dto.discountCode, calculateSaleTotals(saleLines).subtotal)
+      : null;
+    const { lines, subtotal, discountAmount, total } = calculateSaleTotals(saleLines, discount);
 
-    const { items: _items, ...saleData } = dto;
+    const { items: _items, discountCode: _code, ...saleData } = dto;
     const data: Omit<Prisma.SaleCreateInput, 'orderNumber'> = {
       ...saleData,
+      subtotal,
+      discountAmount,
       total,
+      ...(discount && { discount: { connect: { id: discount.id } }, discountCode: discount.code }),
       status: 'PENDING',
       items: {
         create: lines.map((line) => ({
@@ -152,6 +162,7 @@ export class SalesService {
       data: {
         status: dto.status,
         ...(paymentStatus && { paymentStatus }),
+        ...(dto.trackingNumber !== undefined && { trackingNumber: dto.trackingNumber }),
         history: { create: { status: dto.status, note: dto.note, createdBy: user.name } },
       },
       include: saleDetailInclude,
@@ -165,7 +176,7 @@ export function generateOrderNumber(): string {
   return randomBytes(4).toString('hex').toUpperCase();
 }
 
-function toSaleResponse(sale: SaleRow): SaleResponse {
+export function toSaleResponse(sale: SaleRow): SaleResponse {
   return {
     id: sale.id,
     orderNumber: sale.orderNumber,
@@ -173,10 +184,14 @@ function toSaleResponse(sale: SaleRow): SaleResponse {
     customerEmail: sale.customerEmail,
     customerPhone: sale.customerPhone,
     shippingAddress: sale.shippingAddress,
+    trackingNumber: sale.trackingNumber,
     paymentMethod: sale.paymentMethod,
     paymentStatus: sale.paymentStatus,
     status: sale.status,
     notes: sale.notes,
+    subtotal: toNumber(sale.subtotal),
+    discountCode: sale.discountCode,
+    discountAmount: toNumber(sale.discountAmount),
     total: toNumber(sale.total),
     itemsCount: sale._count.items,
     createdAt: sale.createdAt.toISOString(),

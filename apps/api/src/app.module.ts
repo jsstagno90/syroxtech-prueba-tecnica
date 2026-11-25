@@ -12,6 +12,13 @@ import { HealthController } from './health/health.controller.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { SalesModule } from './sales/sales.module.js';
+import { CustomersModule } from './customers/customers.module.js';
+import { DiscountsModule } from './discounts/discounts.module.js';
+import { MembershipsModule } from './memberships/memberships.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
+import { SettingsModule } from './settings/settings.module.js';
+import { StatsModule } from './stats/stats.module.js';
+import { UploadsModule } from './uploads/uploads.module.js';
 
 @Module({
   imports: [
@@ -25,6 +32,13 @@ import { SalesModule } from './sales/sales.module.js';
     ProductsModule,
     SalesModule,
     DashboardModule,
+    SettingsModule,
+    UploadsModule,
+    DiscountsModule,
+    CustomersModule,
+    MembershipsModule,
+    NotificationsModule,
+    StatsModule,
   ],
   controllers: [HealthController],
   providers: [

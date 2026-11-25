@@ -17,12 +17,15 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLogout, useSession } from '@/features/auth/use-session';
 import { initials } from '@/lib/format';
+import { NotificationsBell } from '@/features/notifications/notifications-bell';
+import { useStoreName } from '@/features/settings/api';
 import { BrandLogo } from './brand-logo';
 import { Breadcrumbs } from './breadcrumbs';
 import { SidebarNav } from './sidebar-nav';
 
 export function AppHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const storeName = useStoreName();
 
   return (
     <header className="bg-background/80 sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4 backdrop-blur sm:px-6">
@@ -32,7 +35,7 @@ export function AppHeader() {
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="bg-sidebar p-3">
           <SheetTitle className="sr-only">Menú</SheetTitle>
-          <BrandLogo className="mb-6 px-1 pt-1" />
+          <BrandLogo className="mb-6 px-1 pt-1" name={storeName} />
           <SidebarNav onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
@@ -40,6 +43,7 @@ export function AppHeader() {
       <Breadcrumbs />
 
       <div className="ml-auto flex items-center gap-1">
+        <NotificationsBell />
         <ThemeToggle />
         <UserMenu />
       </div>

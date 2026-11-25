@@ -26,7 +26,7 @@ const SCHEMA_FIELD_TO_IMPORT: Record<string, ProductImportField> = {
 
 interface ValidRow {
   rowNumber: number;
-  data: Omit<CreateProductDto, 'brandId'>;
+  data: Omit<CreateProductDto, 'brandId' | 'images' | 'gender' | 'options' | 'variants'>;
   /** Nombre normalizado de la marca (se resuelve a un id al guardar, por si hay que crearla). */
   brandKey: string | null;
   /** Si el SKU ya existe, se actualiza ese producto en lugar de crear uno nuevo. */
@@ -120,7 +120,9 @@ export class ProductsImportService {
       }
 
       const existingId = sku ? (productIdBySku.get(skuKey) ?? null) : null;
-      const { brandId: _brandId, ...data } = parsed.data;
+      // El Excel no maneja galería, género ni variantes: esos campos no se tocan.
+      const { brandId: _brandId, images: _images, gender: _gender, options: _options, variants: _variants, ...data } =
+        parsed.data;
       validRows.push({ rowNumber: row.rowNumber, data, brandKey, existingId });
       results.push({ rowNumber: row.rowNumber, status: existingId ? 'update' : 'create', name, errors: [] });
     }
@@ -136,8 +138,16 @@ export class ProductsImportService {
         }
         for (const row of validRows) {
           const data = { ...row.data, brandId: row.brandKey ? brandIds.get(row.brandKey)! : null };
-          if (row.existingId) await tx.product.update({ where: { id: row.existingId }, data });
-          else await tx.product.create({ data });
+          if (row.existingId) {
+            // La imagen del Excel pasa a ser la principal sin borrar el resto de la galería.
+            const current = await tx.product.findUnique({ where: { id: row.existingId }, select: { images: true } });
+            const images = data.imageUrl
+              ? [data.imageUrl, ...(current?.images ?? []).filter((url) => url !== data.imageUrl)]
+              : (current?.images ?? []);
+            await tx.product.update({ where: { id: row.existingId }, data: { ...data, imageUrl: images[0] ?? null, images } });
+          } else {
+            await tx.product.create({ data: { ...data, images: data.imageUrl ? [data.imageUrl] : [] } });
+          }
         }
       }, { timeout: 60_000, maxWait: 10_000 });
     }
