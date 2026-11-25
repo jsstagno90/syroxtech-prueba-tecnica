@@ -14,6 +14,7 @@ import { SaleStatusBadge } from '@/features/sales/status-badges';
 import { apiClient } from '@/lib/api/client';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { SalesChart } from './sales-chart';
 
 const STATUS_BAR_COLORS: Record<SaleStatus, string> = {
   PENDING: 'bg-zinc-400',
@@ -61,6 +62,8 @@ export function DashboardPage() {
               hint={`${data.categories} categorías · ${data.brands} marcas`}
             />
           </div>
+
+          <SalesChart data={data.salesByDay} />
 
           <div className="grid gap-6 lg:grid-cols-5">
             <Card className="lg:col-span-3">

@@ -10,6 +10,7 @@ import {
   type PaymentStatus,
   type SaleStatus,
 } from '@admin/shared';
+import { ExportButton } from '@/components/crud/export-button';
 import { DataTable } from '@/components/data-table/data-table';
 import { SearchInput } from '@/components/data-table/search-input';
 import { PageHeader } from '@/components/layout/page-header';
@@ -18,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTableState } from '@/hooks/use-table-state';
 import { saleHooks, type SaleFilters, type SaleSortKey } from './api';
 import { getSaleColumns } from './columns';
+import { exportSales } from './export-sales';
 import { GenerateSaleDialog } from './generate-sale-dialog';
 import { SaleDetailDialog } from './sale-detail-dialog';
 
@@ -43,9 +45,15 @@ export function SalesPage() {
         title="Ventas"
         description="Ventas registradas, su estado de envío y de pago."
         actions={
-          <Button onClick={() => setGenerateOpen(true)}>
-            <Plus /> Generar venta
-          </Button>
+          <>
+            <ExportButton
+              entityLabel="ventas"
+              onExport={() => exportSales({ ...table.query, ...filters })}
+            />
+            <Button onClick={() => setGenerateOpen(true)}>
+              <Plus /> Generar venta
+            </Button>
+          </>
         }
       />
 

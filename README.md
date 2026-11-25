@@ -11,11 +11,12 @@ Panel administrativo genérico y reutilizable para cualquier e-commerce. Esta de
 | Módulo | Funcionalidad |
 | --- | --- |
 | **Login** | Inicio de sesión con JWT guardado en cookie `httpOnly`, opción "Mantener sesión iniciada" y redirección automática si la sesión vence. |
-| **Inicio** | Ingresos, cantidad de ventas, ticket promedio, productos activos, ventas recientes, productos más vendidos y ventas por estado. Todo sale de la base de datos. |
+| **Inicio** | Ingresos, cantidad de ventas, ticket promedio, productos activos, **gráfico de los últimos 30 días** (ingresos o cantidad de ventas por día), ventas recientes, productos más vendidos y ventas por estado. Todo sale de la base de datos. |
 | **Categorías** | CRUD completo con subcategorías (padre/hija) que se despliegan en la misma tabla, posición, búsqueda, orden y paginación. No deja crear ciclos ni nombres repetidos en el mismo nivel, y tampoco borrar una categoría que tenga subcategorías o productos. |
 | **Productos** | CRUD con la misma estructura, alta y edición en una página propia (como en el diseño), filtros por categoría, marca y estado, imagen por URL con vista previa. Sin stock ni pasarela de pagos, como pide la consigna. |
 | **Importar productos** _(extra)_ | Carga masiva desde Excel o CSV en 3 pasos: subir el archivo (con plantilla descargable), **elegir qué columna del archivo corresponde a cada dato** (se propone sola según los encabezados, en cualquier orden) y revisar la validación fila por fila antes de confirmar. Si el SKU ya existe actualiza el producto, puede crear las marcas que falten y entiende precios como `150.000,50` o `$ 1.500`. |
 | **Ventas** | Botón **Generar venta**: un formulario con cliente, productos y cantidades que hace el `create` en la base. El total lo calcula la API con los precios guardados. Listado real con filtros, y una vista **Gestionar orden** con el detalle y el cambio de estado (Pendiente → En preparación → Enviado → Completado / Cancelado), que queda registrado en un historial. |
+| **Exportar a Excel** _(extra)_ | Productos y ventas, respetando la búsqueda y los filtros aplicados. El Excel de productos tiene las mismas columnas que la importación: se puede exportar, editar y volver a importar (los SKU existentes se actualizan). |
 | **Marcas** _(extra)_ | CRUD armado solo con los componentes genéricos, para mostrar lo que cuesta sumar una entidad nueva. |
 
 Además tiene modo oscuro, diseño responsive (menú lateral colapsable y menú deslizable en mobile), documentación de la API con Swagger, tests unitarios y CI con GitHub Actions.

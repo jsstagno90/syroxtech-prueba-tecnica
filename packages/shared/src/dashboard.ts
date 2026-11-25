@@ -7,6 +7,15 @@ export interface TopProduct {
   revenue: number;
 }
 
+export interface SalesByDay {
+  /** Día en formato YYYY-MM-DD (zona horaria de la tienda). */
+  date: string;
+  /** Ventas registradas ese día (todas, incluso canceladas). */
+  sales: number;
+  /** Ingresos del día: ventas pagadas y no canceladas. */
+  revenue: number;
+}
+
 export interface DashboardSummary {
   products: { total: number; active: number };
   categories: number;
@@ -20,4 +29,6 @@ export interface DashboardSummary {
   };
   recentSales: SaleResponse[];
   topProducts: TopProduct[];
+  /** Últimos 30 días, incluidos los días sin ventas (en 0). */
+  salesByDay: SalesByDay[];
 }

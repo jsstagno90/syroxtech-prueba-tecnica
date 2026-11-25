@@ -190,58 +190,64 @@ async function main() {
   const now = Date.now();
   const DAY = 24 * 60 * 60 * 1000;
 
-  for (let i = 0; i < 28; i++) {
-    const status = random.pick(finalStatuses);
-    const [customerName, customerEmail] = random.pick(CUSTOMERS);
-    const createdAt = new Date(now - (28 - i) * DAY + random.int(8, 20) * 60 * 60 * 1000);
+  // Entre 0 y 3 ventas por día en los últimos 30 días, para que el gráfico del inicio se vea realista.
+  const salesPerDay = [0, 1, 1, 2, 2, 3] as const;
+  let salesCount = 0;
+  for (let daysAgo = 29; daysAgo >= 0; daysAgo--) {
+    const count = random.pick(salesPerDay);
+    for (let n = 0; n < count; n++) {
+      const i = salesCount++;
+      const status = daysAgo < 2 ? random.pick(['PENDING', 'PREPARING'] as const) : random.pick(finalStatuses);
+      const [customerName, customerEmail] = random.pick(CUSTOMERS);
+      const createdAt = new Date(now - daysAgo * DAY - random.int(1, 10) * 60 * 60 * 1000);
+      const chosen = new Set<(typeof activeProducts)[number]>();
+      const linesCount = random.int(1, 3);
+      while (chosen.size < linesCount) chosen.add(random.pick(activeProducts));
 
-    const chosen = new Set<(typeof activeProducts)[number]>();
-    const linesCount = random.int(1, 3);
-    while (chosen.size < linesCount) chosen.add(random.pick(activeProducts));
+      const { lines, total } = calculateSaleTotals(
+        [...chosen].map((product) => ({ product, unitPrice: product.price.toNumber(), quantity: random.int(1, 2) })),
+      );
 
-    const { lines, total } = calculateSaleTotals(
-      [...chosen].map((product) => ({ product, unitPrice: product.price.toNumber(), quantity: random.int(1, 2) })),
-    );
+      let paymentStatus: PaymentStatus = 'PAID';
+      if (status === 'PENDING') paymentStatus = random.pick(['PENDING', 'PAID'] as const);
+      if (status === 'CANCELLED') paymentStatus = random.pick(['FAILED', 'REFUNDED'] as const);
 
-    let paymentStatus: PaymentStatus = 'PAID';
-    if (status === 'PENDING') paymentStatus = random.pick(['PENDING', 'PAID'] as const);
-    if (status === 'CANCELLED') paymentStatus = random.pick(['FAILED', 'REFUNDED'] as const);
-
-    const path = STATUS_PATHS[status];
-    await prisma.sale.create({
-      data: {
-        orderNumber: (0x10000000 + i * 7919 * 4093).toString(16).toUpperCase().slice(-8),
-        customerName,
-        customerEmail,
-        customerPhone: `291 4${random.int(100000, 999999)}`,
-        shippingAddress: random.pick(ADDRESSES),
-        paymentMethod: random.pick(methods),
-        paymentStatus,
-        status,
-        total,
-        createdAt,
-        items: {
-          create: lines.map((line) => ({
-            productId: line.product.id,
-            productName: line.product.name,
-            unitPrice: line.unitPrice,
-            quantity: line.quantity,
-            subtotal: line.subtotal,
-          })),
+      const path = STATUS_PATHS[status];
+      await prisma.sale.create({
+        data: {
+          orderNumber: (0x10000000 + i * 7919 * 4093).toString(16).toUpperCase().slice(-8),
+          customerName,
+          customerEmail,
+          customerPhone: `291 4${random.int(100000, 999999)}`,
+          shippingAddress: random.pick(ADDRESSES),
+          paymentMethod: random.pick(methods),
+          paymentStatus,
+          status,
+          total,
+          createdAt,
+          items: {
+            create: lines.map((line) => ({
+              productId: line.product.id,
+              productName: line.product.name,
+              unitPrice: line.unitPrice,
+              quantity: line.quantity,
+              subtotal: line.subtotal,
+            })),
+          },
+          history: {
+            create: path.map((step, index) => ({
+              status: step,
+              note: STATUS_NOTES[step] ?? null,
+              createdBy: DEMO_USER.name,
+              createdAt: new Date(Math.min(createdAt.getTime() + index * (DAY / 2), now)),
+            })),
+          },
         },
-        history: {
-          create: path.map((step, index) => ({
-            status: step,
-            note: STATUS_NOTES[step] ?? null,
-            createdBy: DEMO_USER.name,
-            createdAt: new Date(createdAt.getTime() + index * (DAY / 2)),
-          })),
-        },
-      },
-    });
+      });
+    }
   }
 
-  console.log(`✅ Listo: ${categoryIds.size} categorías, ${BRANDS.length} marcas, ${products.length} productos y 28 ventas.`);
+  console.log(`✅ Listo: ${categoryIds.size} categorías, ${BRANDS.length} marcas, ${products.length} productos y ${salesCount} ventas.`);
   console.log(`   Usuario demo: ${DEMO_USER.email} / ${DEMO_USER.password}`);
 }
 

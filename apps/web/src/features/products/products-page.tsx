@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FileUp, FilterX, Plus } from 'lucide-react';
 import type { ProductResponse } from '@admin/shared';
 import { ConfirmDialog } from '@/components/crud/confirm-dialog';
+import { ExportButton } from '@/components/crud/export-button';
 import { DataTable } from '@/components/data-table/data-table';
 import { SearchInput } from '@/components/data-table/search-input';
 import { PageHeader } from '@/components/layout/page-header';
@@ -17,6 +18,7 @@ import { brandHooks } from '@/features/brands/api';
 import { buildCategoryPaths, categoryHooks } from '@/features/categories/api';
 import { productHooks, type ProductFilters, type ProductSortKey } from './api';
 import { getProductColumns } from './columns';
+import { exportProducts } from './export-products';
 import { ImportProductsDialog } from './import/import-products-dialog';
 
 const ALL = 'all';
@@ -56,6 +58,10 @@ export function ProductsPage() {
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <FileUp /> Importar productos
             </Button>
+            <ExportButton
+              entityLabel="productos"
+              onExport={() => exportProducts({ ...table.query, ...filters }, categories)}
+            />
             <Button asChild>
               <Link href="/productos/nuevo">
                 <Plus /> Nuevo producto
