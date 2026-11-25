@@ -10,7 +10,7 @@ import { DataTable } from '@/components/data-table/data-table';
 import { SearchInput } from '@/components/data-table/search-input';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCrudState } from '@/hooks/use-crud-state';
 import { useTableState } from '@/hooks/use-table-state';
 import { brandHooks } from '@/features/brands/api';
@@ -20,6 +20,7 @@ import { getProductColumns } from './columns';
 import { ImportProductsDialog } from './import/import-products-dialog';
 
 const ALL = 'all';
+const NO_BRAND = 'none';
 
 export function ProductsPage() {
   const router = useRouter();
@@ -103,13 +104,17 @@ export function ProductsPage() {
               </Select>
               <Select
                 value={filters.brandId ? String(filters.brandId) : ALL}
-                onValueChange={(value) => updateFilter({ brandId: value === ALL ? undefined : Number(value) })}
+                onValueChange={(value) =>
+                  updateFilter({ brandId: value === ALL ? undefined : value === NO_BRAND ? 'none' : Number(value) })
+                }
               >
                 <SelectTrigger className="sm:w-40" aria-label="Filtrar por marca">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>Todas las marcas</SelectItem>
+                  <SelectItem value={NO_BRAND}>Sin marca</SelectItem>
+                  <SelectSeparator />
                   {brands.map((brand) => (
                     <SelectItem key={brand.id} value={String(brand.id)}>
                       {brand.name}

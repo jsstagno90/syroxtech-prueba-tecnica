@@ -7,7 +7,8 @@ export type ProductSortKey = 'name' | 'price' | 'createdAt';
 
 export interface ProductFilters {
   categoryId?: number;
-  brandId?: number;
+  /** Id de marca, o 'none' para los productos sin marca. */
+  brandId?: number | 'none';
   isActive?: boolean;
 }
 

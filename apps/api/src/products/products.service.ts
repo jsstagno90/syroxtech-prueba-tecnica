@@ -106,7 +106,7 @@ function buildFilters(query: ProductListQuery): Prisma.ProductWhereInput[] {
     // Filtrar por una categoría principal (ej. "Hombre") también trae los productos de sus subcategorías.
     filters.push({ OR: [{ categoryId: query.categoryId }, { category: { parentId: query.categoryId } }] });
   }
-  if (query.brandId) filters.push({ brandId: query.brandId });
+  if (query.brandId) filters.push({ brandId: query.brandId === 'none' ? null : query.brandId });
   if (query.isActive !== undefined) filters.push({ isActive: query.isActive });
 
   return filters;

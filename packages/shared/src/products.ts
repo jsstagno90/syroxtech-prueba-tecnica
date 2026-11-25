@@ -33,7 +33,8 @@ export const updateProductSchema = z.object(productFields).partial();
 
 export const productListQuerySchema = createListQuerySchema(['name', 'price', 'createdAt'] as const).extend({
   categoryId: z.coerce.number().int().positive().optional(),
-  brandId: z.coerce.number().int().positive().optional(),
+  /** Un id de marca, o "none" para los productos sin marca. */
+  brandId: z.union([z.literal('none'), z.coerce.number().int().positive()]).optional(),
   isActive: z.stringbool().optional(),
 });
 
