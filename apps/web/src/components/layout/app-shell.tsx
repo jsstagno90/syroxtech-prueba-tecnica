@@ -20,28 +20,29 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen">
       <aside
         className={cn(
-          'bg-sidebar border-sidebar-border sticky top-0 hidden h-screen shrink-0 flex-col border-r transition-[width] duration-200 lg:flex',
+          'bg-sidebar border-sidebar-border sticky top-0 z-40 hidden h-screen shrink-0 flex-col border-r transition-[width] duration-200 lg:flex',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
-        <div className={cn('flex h-14 items-center border-b px-3', collapsed ? 'justify-center' : 'justify-between')}>
+        <div className={cn('flex h-14 items-center border-b px-3', collapsed && 'justify-center')}>
           <BrandLogo collapsed={collapsed} />
-          {!collapsed && (
-            <Button variant="ghost" size="icon-sm" onClick={toggle} aria-label="Contraer menú">
-              <ChevronsLeft />
-            </Button>
-          )}
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           <SidebarNav collapsed={collapsed} />
         </div>
-        {collapsed && (
-          <div className="border-t p-3">
-            <Button variant="ghost" size="icon" className="w-full" onClick={toggle} aria-label="Expandir menú">
-              <ChevronsRight />
-            </Button>
-          </div>
-        )}
+
+        {/* Sobre el borde del menú: mismo lugar para abrirlo y cerrarlo, siempre visible. */}
+        <Button
+          variant="outline"
+          size="icon-sm"
+          onClick={toggle}
+          aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expandir menú' : 'Contraer menú'}
+          className="bg-background text-muted-foreground hover:text-foreground absolute top-4 -right-3 size-6 rounded-full shadow-sm [&_svg]:size-3.5"
+        >
+          {collapsed ? <ChevronsRight /> : <ChevronsLeft />}
+        </Button>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
