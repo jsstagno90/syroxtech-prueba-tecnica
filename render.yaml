@@ -1,0 +1,26 @@
+# Blueprint de Render: crea la base PostgreSQL y la API en un paso.
+# Render → New → Blueprint → elegir este repositorio.
+databases:
+  - name: admin-panel-db
+    plan: free
+    databaseName: admin_panel
+    user: admin_panel
+
+services:
+  - type: web
+    name: admin-panel-api
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter api build
+    # Aplica migraciones, carga la demo solo si la base está vacía y levanta la API.
+    startCommand: pnpm --filter api start:render
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DATABASE_URL
+        fromDatabase:
+          name: admin-panel-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
