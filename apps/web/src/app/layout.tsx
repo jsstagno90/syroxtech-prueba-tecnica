@@ -13,7 +13,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full font-sans">
+      {/* suppressHydrationWarning: algunas extensiones del navegador agregan clases al body antes de que cargue React. */}
+      <body className="min-h-full font-sans" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>
