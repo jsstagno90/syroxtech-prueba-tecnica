@@ -122,6 +122,22 @@ describe('SalesService', () => {
       expect(prisma.sale.update).not.toHaveBeenCalled();
     });
 
+    it('permite volver al paso anterior si hubo un error', async () => {
+      prisma.sale.findUnique.mockResolvedValue({ status: 'COMPLETED', paymentStatus: 'PAID' });
+      prisma.sale.update.mockResolvedValue(fakeSaleRow({ status: 'SHIPPED', paymentStatus: 'PAID' }));
+      await service.updateStatus(10, { status: 'SHIPPED', note: null }, user);
+      expect(prisma.sale.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'SHIPPED' }) }),
+      );
+    });
+
+    it('una venta cancelada no se puede reabrir', async () => {
+      prisma.sale.findUnique.mockResolvedValue({ status: 'CANCELLED', paymentStatus: 'REFUNDED' });
+      await expect(service.updateStatus(10, { status: 'PENDING', note: null }, user)).rejects.toThrow(
+        'No se puede pasar de "Cancelado" a "Pendiente"',
+      );
+    });
+
     it('al cancelar una venta cobrada la marca como reembolsada y lo registra en el historial', async () => {
       prisma.sale.findUnique.mockResolvedValue({ status: 'PREPARING', paymentStatus: 'PAID' });
       prisma.sale.update.mockResolvedValue(fakeSaleRow({ status: 'CANCELLED', paymentStatus: 'REFUNDED' }));

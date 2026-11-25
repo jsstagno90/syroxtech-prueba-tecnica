@@ -1,18 +1,29 @@
 'use client';
 
 import { useState } from 'react';
-import type { SaleResponse, SaleStatus } from '@admin/shared';
+import { isSaleStatusRollback, type SaleResponse, type SaleStatus } from '@admin/shared';
 import { ConfirmDialog } from '@/components/crud/confirm-dialog';
 import { useUpdateSaleStatus } from './api';
 
 /** Texto de cada acción según el estado al que lleva. */
 export const SALE_ACTION_LABELS: Record<SaleStatus, string> = {
-  PENDING: 'Volver a pendiente',
+  PENDING: 'Pasar a pendiente',
   PREPARING: 'Pasar a preparación',
   SHIPPED: 'Marcar como enviado',
   COMPLETED: 'Completar pedido',
   CANCELLED: 'Cancelar venta',
 };
+
+const ROLLBACK_LABELS: Partial<Record<SaleStatus, string>> = {
+  PENDING: 'Volver a pendiente',
+  PREPARING: 'Volver a preparación',
+  SHIPPED: 'Volver a enviado',
+};
+
+/** Texto del botón para ir de `from` a `to`, distinguiendo avanzar de deshacer. */
+export function saleActionLabel(from: SaleStatus, to: SaleStatus): string {
+  return isSaleStatusRollback(from, to) ? (ROLLBACK_LABELS[to] ?? SALE_ACTION_LABELS[to]) : SALE_ACTION_LABELS[to];
+}
 
 interface PendingCancel {
   sale: Pick<SaleResponse, 'id' | 'orderNumber' | 'paymentStatus'>;

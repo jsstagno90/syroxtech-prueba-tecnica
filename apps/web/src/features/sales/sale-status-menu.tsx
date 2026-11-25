@@ -1,7 +1,7 @@
 'use client';
 
-import { ChevronDown, Loader2 } from 'lucide-react';
-import { SALE_STATUS_LABELS, SALE_STATUS_TRANSITIONS, type SaleResponse } from '@admin/shared';
+import { ChevronDown, Loader2, Undo2 } from 'lucide-react';
+import { isSaleStatusRollback, SALE_STATUS_LABELS, SALE_STATUS_TRANSITIONS, type SaleResponse } from '@admin/shared';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,15 +11,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SaleStatusBadge } from './status-badges';
-import { SALE_ACTION_LABELS, useSaleStatusChange } from './use-sale-status-change';
+import { SALE_ACTION_LABELS, saleActionLabel, useSaleStatusChange } from './use-sale-status-change';
 
 /**
  * Estado de la venta con un menú para avanzarlo desde la tabla.
- * Solo ofrece los pasos permitidos por el flujo; las ventas cerradas no tienen menú.
+ * Ofrece avanzar, volver un paso atrás (por si fue un error) o cancelar, según el flujo.
+ * Las ventas canceladas no tienen menú.
  */
 export function SaleStatusMenu({ sale }: { sale: SaleResponse }) {
   const { change, confirmDialog, isPending } = useSaleStatusChange();
   const nextStatuses = SALE_STATUS_TRANSITIONS[sale.status];
+  const forward = nextStatuses.filter((status) => status !== 'CANCELLED' && !isSaleStatusRollback(sale.status, status));
+  const back = nextStatuses.find((status) => isSaleStatusRollback(sale.status, status));
 
   if (nextStatuses.length === 0) return <SaleStatusBadge status={sale.status} />;
 
@@ -40,13 +43,17 @@ export function SaleStatusMenu({ sale }: { sale: SaleResponse }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-52">
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">Cambiar estado</DropdownMenuLabel>
-          {nextStatuses
-            .filter((status) => status !== 'CANCELLED')
-            .map((status) => (
-              <DropdownMenuItem key={status} onSelect={() => change(sale, status)}>
-                {SALE_ACTION_LABELS[status]}
-              </DropdownMenuItem>
-            ))}
+          {forward.map((status) => (
+            <DropdownMenuItem key={status} onSelect={() => change(sale, status)}>
+              {SALE_ACTION_LABELS[status]}
+            </DropdownMenuItem>
+          ))}
+          {back && (
+            <DropdownMenuItem onSelect={() => change(sale, back)}>
+              <Undo2 className="text-muted-foreground" />
+              {saleActionLabel(sale.status, back)}
+            </DropdownMenuItem>
+          )}
           {nextStatuses.includes('CANCELLED') && (
             <>
               <DropdownMenuSeparator />

@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { CircleCheck, CreditCard, History, Loader2, MapPin, Package, Truck, User } from 'lucide-react';
+import { CircleCheck, CreditCard, History, Loader2, MapPin, Package, Truck, Undo2, User } from 'lucide-react';
 import {
   PAYMENT_METHOD_LABELS,
+  isSaleStatusRollback,
   SALE_STATUS_TRANSITIONS,
   type SaleDetailResponse,
+  type SaleStatus,
 } from '@admin/shared';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import { useSaleDetail } from './api';
 import { PaymentStatusBadge, SaleStatusBadge } from './status-badges';
-import { SALE_ACTION_LABELS, useSaleStatusChange } from './use-sale-status-change';
+import { saleActionLabel, useSaleStatusChange } from './use-sale-status-change';
 
 
 interface SaleDetailDialogProps {
@@ -111,13 +113,15 @@ function SaleDetail({ sale }: { sale: SaleDetailResponse }) {
 function StatusActions({ sale }: { sale: SaleDetailResponse }) {
   const [note, setNote] = useState('');
   const { change, confirmDialog, isPending, pendingStatus } = useSaleStatusChange();
-  const nextStatuses = SALE_STATUS_TRANSITIONS[sale.status];
+  // Orden de los botones: deshacer, cancelar y la acción principal a la derecha.
+  const rank = (status: SaleStatus) => (isSaleStatusRollback(sale.status, status) ? 0 : status === 'CANCELLED' ? 1 : 2);
+  const nextStatuses = [...SALE_STATUS_TRANSITIONS[sale.status]].sort((a, b) => rank(a) - rank(b));
 
   if (nextStatuses.length === 0) {
     return (
       <p className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-lg p-3 text-sm">
         <CircleCheck className="size-4" />
-        Esta venta está cerrada: no admite más cambios de estado.
+        Esta venta está cancelada: no admite más cambios de estado.
       </p>
     );
   }
@@ -136,18 +140,21 @@ function StatusActions({ sale }: { sale: SaleDetailResponse }) {
         />
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        {nextStatuses.map((status) => (
-          <Button
-            key={status}
-            variant={status === 'CANCELLED' ? 'outline' : 'default'}
-            className={status === 'CANCELLED' ? 'text-destructive hover:text-destructive' : undefined}
-            disabled={isPending}
-            onClick={() => change(sale, status, { note: note.trim() || null, onDone: () => setNote('') })}
-          >
-            {isPending && pendingStatus === status && <Loader2 className="animate-spin" />}
-            {SALE_ACTION_LABELS[status]}
-          </Button>
-        ))}
+        {nextStatuses.map((status) => {
+          const rollback = isSaleStatusRollback(sale.status, status);
+          return (
+            <Button
+              key={status}
+              variant={rollback ? 'ghost' : status === 'CANCELLED' ? 'outline' : 'default'}
+              className={status === 'CANCELLED' ? 'text-destructive hover:text-destructive' : rollback ? 'sm:mr-auto' : undefined}
+              disabled={isPending}
+              onClick={() => change(sale, status, { note: note.trim() || null, onDone: () => setNote('') })}
+            >
+              {isPending && pendingStatus === status ? <Loader2 className="animate-spin" /> : rollback && <Undo2 />}
+              {saleActionLabel(sale.status, status)}
+            </Button>
+          );
+        })}
       </div>
       {confirmDialog}
     </div>

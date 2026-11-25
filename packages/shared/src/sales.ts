@@ -15,16 +15,32 @@ export const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
 };
 
 /**
- * Flujo de una venta. La API rechaza cualquier cambio que no esté acá
- * y el panel usa el mismo mapa para mostrar solo las acciones posibles.
+ * Paso anterior de cada estado, para deshacer un cambio hecho por error.
+ * Cancelar no se deshace: puede haber disparado un reembolso.
+ */
+export const SALE_STATUS_PREVIOUS: Partial<Record<SaleStatus, SaleStatus>> = {
+  PREPARING: 'PENDING',
+  SHIPPED: 'PREPARING',
+  COMPLETED: 'SHIPPED',
+};
+
+/**
+ * Flujo de una venta: avanzar un paso, volver uno atrás o cancelar antes del envío.
+ * La API rechaza cualquier cambio que no esté acá y el panel usa el mismo mapa
+ * para mostrar solo las acciones posibles.
  */
 export const SALE_STATUS_TRANSITIONS: Record<SaleStatus, readonly SaleStatus[]> = {
   PENDING: ['PREPARING', 'CANCELLED'],
-  PREPARING: ['SHIPPED', 'CANCELLED'],
-  SHIPPED: ['COMPLETED'],
-  COMPLETED: [],
+  PREPARING: ['SHIPPED', 'PENDING', 'CANCELLED'],
+  SHIPPED: ['COMPLETED', 'PREPARING'],
+  COMPLETED: ['SHIPPED'],
   CANCELLED: [],
 };
+
+/** True si el cambio es volver al paso anterior (y no avanzar). */
+export function isSaleStatusRollback(from: SaleStatus, to: SaleStatus): boolean {
+  return SALE_STATUS_PREVIOUS[from] === to;
+}
 
 export function canTransitionSale(from: SaleStatus, to: SaleStatus): boolean {
   return SALE_STATUS_TRANSITIONS[from].includes(to);
