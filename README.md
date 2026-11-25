@@ -2,8 +2,8 @@
 
 Panel administrativo genérico y reutilizable para cualquier e-commerce. Esta demo usa la marca ficticia **Tennis Star** (tienda de calzado), pero el nombre, la moneda y el idioma se cambian por variables de entorno.
 
-> **Demo online:** _(completar con la URL de Vercel)_
-> **API + Swagger:** _(completar con la URL de Render)_/api/docs
+> **Demo online:** https://syroxtech-prueba-tecnica.vercel.app
+> **API + Swagger:** https://admin-panel-api-8fq4.onrender.com/api/docs
 > **Usuario de prueba:** `admin@demo.com` / `demo1234`
 
 ## Qué incluye
