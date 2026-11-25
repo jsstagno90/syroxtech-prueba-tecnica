@@ -15,8 +15,7 @@ import { SALE_ACTION_LABELS, saleActionLabel, useSaleStatusChange } from './use-
 
 /**
  * Estado de la venta con un menú para avanzarlo desde la tabla.
- * Ofrece avanzar, volver un paso atrás (por si fue un error) o cancelar, según el flujo.
- * Las ventas canceladas no tienen menú.
+ * Ofrece avanzar, volver un paso atrás (por si fue un error), cancelar o reabrir, según el flujo.
  */
 export function SaleStatusMenu({ sale }: { sale: SaleResponse }) {
   const { change, confirmDialog, isPending } = useSaleStatusChange();

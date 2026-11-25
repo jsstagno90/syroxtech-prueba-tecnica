@@ -20,60 +20,90 @@ const ROLLBACK_LABELS: Partial<Record<SaleStatus, string>> = {
   SHIPPED: 'Volver a enviado',
 };
 
-/** Texto del botón para ir de `from` a `to`, distinguiendo avanzar de deshacer. */
+/** Texto del botón para ir de `from` a `to`, distinguiendo avanzar, deshacer y reabrir. */
 export function saleActionLabel(from: SaleStatus, to: SaleStatus): string {
+  if (from === 'CANCELLED') return 'Reabrir como pendiente';
   return isSaleStatusRollback(from, to) ? (ROLLBACK_LABELS[to] ?? SALE_ACTION_LABELS[to]) : SALE_ACTION_LABELS[to];
 }
 
-interface PendingCancel {
-  sale: Pick<SaleResponse, 'id' | 'orderNumber' | 'paymentStatus'>;
+type SaleRef = Pick<SaleResponse, 'id' | 'orderNumber' | 'status' | 'paymentStatus'>;
+
+interface PendingConfirm {
+  sale: SaleRef;
+  status: SaleStatus;
   note: string | null;
   onDone?: () => void;
 }
 
+/** Cancelar y reabrir tocan el estado del pago, así que piden confirmación. */
+function needsConfirmation(sale: SaleRef, status: SaleStatus) {
+  return status === 'CANCELLED' || sale.status === 'CANCELLED';
+}
+
+function confirmCopy({ sale, status }: PendingConfirm) {
+  if (status === 'CANCELLED') {
+    return {
+      title: `¿Cancelar la venta #${sale.orderNumber}?`,
+      description:
+        sale.paymentStatus === 'PAID'
+          ? 'Como ya estaba cobrada, el pago queda marcado como reembolsado. Si fue un error, después la podés reabrir.'
+          : 'Si fue un error, después la podés reabrir.',
+      confirmLabel: 'Sí, cancelar venta',
+      destructive: true,
+    };
+  }
+  return {
+    title: `¿Reabrir la venta #${sale.orderNumber}?`,
+    description:
+      sale.paymentStatus === 'REFUNDED'
+        ? 'Vuelve a quedar pendiente y el pago pasa de reembolsado a pagado.'
+        : 'Vuelve a quedar pendiente para seguir su flujo normal.',
+    confirmLabel: 'Sí, reabrir venta',
+    destructive: false,
+  };
+}
+
 /**
- * Cambia el estado de una venta. Cancelar es irreversible, así que pide confirmación;
+ * Cambia el estado de una venta. Cancelar y reabrir piden confirmación;
  * el resto de los pasos se aplican directo. Se usa desde la tabla y desde el detalle.
  */
 export function useSaleStatusChange() {
   const updateStatus = useUpdateSaleStatus();
-  const [pendingCancel, setPendingCancel] = useState<PendingCancel | null>(null);
+  const [pending, setPending] = useState<PendingConfirm | null>(null);
 
   const change = (
-    sale: PendingCancel['sale'],
+    sale: SaleRef,
     status: SaleStatus,
     options: { note?: string | null; onDone?: () => void } = {},
   ) => {
     const note = options.note ?? null;
-    if (status === 'CANCELLED') {
-      setPendingCancel({ sale, note, onDone: options.onDone });
+    if (needsConfirmation(sale, status)) {
+      setPending({ sale, status, note, onDone: options.onDone });
       return;
     }
     updateStatus.mutate({ id: sale.id, data: { status, note } }, { onSuccess: options.onDone });
   };
 
+  const copy = pending ? confirmCopy(pending) : null;
+
   const confirmDialog = (
     <ConfirmDialog
-      open={pendingCancel !== null}
-      onOpenChange={(open) => !open && setPendingCancel(null)}
-      title={`¿Cancelar la venta #${pendingCancel?.sale.orderNumber ?? ''}?`}
-      description={
-        <>
-          Esta acción no se puede deshacer.
-          {pendingCancel?.sale.paymentStatus === 'PAID' && ' Como ya estaba cobrada, el pago queda marcado como reembolsado.'}
-        </>
-      }
-      confirmLabel="Sí, cancelar venta"
-      destructive
+      open={pending !== null}
+      onOpenChange={(open) => !open && setPending(null)}
+      title={copy?.title ?? ''}
+      description={copy?.description}
+      confirmLabel={copy?.confirmLabel}
+      cancelLabel="Volver"
+      destructive={copy?.destructive}
       loading={updateStatus.isPending}
       onConfirm={() => {
-        if (!pendingCancel) return;
-        const { sale, note, onDone } = pendingCancel;
+        if (!pending) return;
+        const { sale, status, note, onDone } = pending;
         updateStatus.mutate(
-          { id: sale.id, data: { status: 'CANCELLED', note } },
+          { id: sale.id, data: { status, note } },
           {
             onSuccess: () => {
-              setPendingCancel(null);
+              setPending(null);
               onDone?.();
             },
           },

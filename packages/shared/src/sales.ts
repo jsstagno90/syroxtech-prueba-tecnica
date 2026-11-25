@@ -16,16 +16,18 @@ export const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
 
 /**
  * Paso anterior de cada estado, para deshacer un cambio hecho por error.
- * Cancelar no se deshace: puede haber disparado un reembolso.
+ * Una venta cancelada se reabre como pendiente.
  */
 export const SALE_STATUS_PREVIOUS: Partial<Record<SaleStatus, SaleStatus>> = {
   PREPARING: 'PENDING',
   SHIPPED: 'PREPARING',
   COMPLETED: 'SHIPPED',
+  CANCELLED: 'PENDING',
 };
 
 /**
- * Flujo de una venta: avanzar un paso, volver uno atrás o cancelar antes del envío.
+ * Flujo de una venta: avanzar un paso, volver uno atrás, cancelar antes del envío
+ * o reabrir una cancelada.
  * La API rechaza cualquier cambio que no esté acá y el panel usa el mismo mapa
  * para mostrar solo las acciones posibles.
  */
@@ -34,7 +36,7 @@ export const SALE_STATUS_TRANSITIONS: Record<SaleStatus, readonly SaleStatus[]> 
   PREPARING: ['SHIPPED', 'PENDING', 'CANCELLED'],
   SHIPPED: ['COMPLETED', 'PREPARING'],
   COMPLETED: ['SHIPPED'],
-  CANCELLED: [],
+  CANCELLED: ['PENDING'],
 };
 
 /** True si el cambio es volver al paso anterior (y no avanzar). */

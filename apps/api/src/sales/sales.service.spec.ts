@@ -131,10 +131,19 @@ describe('SalesService', () => {
       );
     });
 
-    it('una venta cancelada no se puede reabrir', async () => {
+    it('reabrir una venta cancelada la deja pendiente y vuelve el pago a cobrado', async () => {
       prisma.sale.findUnique.mockResolvedValue({ status: 'CANCELLED', paymentStatus: 'REFUNDED' });
-      await expect(service.updateStatus(10, { status: 'PENDING', note: null }, user)).rejects.toThrow(
-        'No se puede pasar de "Cancelado" a "Pendiente"',
+      prisma.sale.update.mockResolvedValue(fakeSaleRow({ status: 'PENDING', paymentStatus: 'PAID' }));
+      await service.updateStatus(10, { status: 'PENDING', note: 'Se canceló por error' }, user);
+      expect(prisma.sale.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'PENDING', paymentStatus: 'PAID' }) }),
+      );
+    });
+
+    it('una venta cancelada solo se reabre como pendiente', async () => {
+      prisma.sale.findUnique.mockResolvedValue({ status: 'CANCELLED', paymentStatus: 'PENDING' });
+      await expect(service.updateStatus(10, { status: 'SHIPPED', note: null }, user)).rejects.toThrow(
+        'No se puede pasar de "Cancelado" a "Enviado"',
       );
     });
 

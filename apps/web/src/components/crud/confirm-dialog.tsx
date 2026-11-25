@@ -19,6 +19,8 @@ interface ConfirmDialogProps {
   title: string;
   description: ReactNode;
   confirmLabel?: string;
+  /** Texto del botón para salir sin hacer nada. */
+  cancelLabel?: string;
   destructive?: boolean;
   loading?: boolean;
   onConfirm: () => void | Promise<unknown>;
@@ -31,6 +33,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = 'Confirmar',
+  cancelLabel = 'Cancelar',
   destructive = false,
   loading = false,
   onConfirm,
@@ -43,7 +46,7 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>
           {/* Botón común (no AlertDialogAction) para que el modal no se cierre antes de terminar. */}
           <Button variant={destructive ? 'destructive' : 'default'} disabled={loading} onClick={() => void onConfirm()}>
             {loading && <Loader2 className="animate-spin" />}

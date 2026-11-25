@@ -131,7 +131,7 @@ export class SalesService {
     }
   }
 
-  /** Avanza la venta en su flujo (ver SALE_STATUS_TRANSITIONS) y lo deja registrado en el historial. */
+  /** Mueve la venta en su flujo (ver SALE_STATUS_TRANSITIONS) y lo deja registrado en el historial. */
   async updateStatus(id: number, dto: UpdateSaleStatusDto, user: AuthUser): Promise<SaleDetailResponse> {
     const sale = await this.prisma.sale.findUnique({ where: { id }, select: { status: true, paymentStatus: true } });
     if (!sale) throw new NotFoundException(`La venta ${id} no existe`);
@@ -142,8 +142,10 @@ export class SalesService {
       );
     }
 
-    // Cancelar una venta ya cobrada la deja como reembolsada.
-    const paymentStatus = dto.status === 'CANCELLED' && sale.paymentStatus === 'PAID' ? 'REFUNDED' : undefined;
+    // Cancelar una venta cobrada la deja como reembolsada; reabrirla deshace ese reembolso.
+    let paymentStatus: 'PAID' | 'REFUNDED' | undefined;
+    if (dto.status === 'CANCELLED' && sale.paymentStatus === 'PAID') paymentStatus = 'REFUNDED';
+    if (sale.status === 'CANCELLED' && sale.paymentStatus === 'REFUNDED') paymentStatus = 'PAID';
 
     const updated = await this.prisma.sale.update({
       where: { id },
