@@ -20,7 +20,12 @@ export const createCategorySchema = z.object({
 
 export const updateCategorySchema = z.object(categoryFields).partial();
 
-export const categoryListQuerySchema = createListQuerySchema(['name', 'position', 'createdAt'] as const);
+export const categoryListQuerySchema = createListQuerySchema(['name', 'position', 'createdAt'] as const).extend({
+  /** Solo las hijas directas de esta categoría (para desplegar el árbol). */
+  parentId: z.coerce.number().int().positive().optional(),
+  /** Solo las categorías principales (sin padre). */
+  rootOnly: z.stringbool().optional(),
+});
 
 export type CreateCategoryInput = z.input<typeof createCategorySchema>;
 export type CreateCategoryDto = z.output<typeof createCategorySchema>;

@@ -23,9 +23,11 @@ export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: CategoryListQuery): Promise<PaginatedResponse<CategoryResponse>> {
-    const where: Prisma.CategoryWhereInput = query.search
-      ? { name: { contains: query.search, mode: 'insensitive' } }
-      : {};
+    const filters: Prisma.CategoryWhereInput[] = [];
+    if (query.search) filters.push({ name: { contains: query.search, mode: 'insensitive' } });
+    if (query.parentId) filters.push({ parentId: query.parentId });
+    else if (query.rootOnly) filters.push({ parentId: null });
+    const where: Prisma.CategoryWhereInput = { AND: filters };
     // Sin orden elegido: primero las principales y después las subcategorías agrupadas por padre.
     const orderBy: Prisma.CategoryOrderByWithRelationInput[] = query.sortBy
       ? [{ [query.sortBy]: query.sortOrder }]

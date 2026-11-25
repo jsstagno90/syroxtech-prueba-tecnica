@@ -13,11 +13,14 @@ import { useTableState } from '@/hooks/use-table-state';
 import { categoryHooks, type CategorySortKey } from './api';
 import { CategoryFormDialog } from './category-form-dialog';
 import { getCategoryColumns } from './columns';
+import { SubcategoryRows } from './subcategory-rows';
 
 export function CategoriesPage() {
   const table = useTableState<CategorySortKey>();
   const crud = useCrudState<CategoryResponse>();
-  const list = categoryHooks.useList(table.query);
+  // Sin búsqueda se ve el árbol (principales con sus hijas desplegables); buscando, la lista plana.
+  const isSearching = !!table.query.search;
+  const list = categoryHooks.useList({ ...table.query, rootOnly: !isSearching });
   const remove = categoryHooks.useRemove();
 
   const { openEdit, askDelete } = crud;
@@ -48,6 +51,15 @@ export function CategoriesPage() {
         onPageSizeChange={table.setPageSize}
         emptyMessage={table.query.search ? 'Ninguna categoría coincide con la búsqueda.' : 'Todavía no hay categorías.'}
         toolbar={<SearchInput value={table.searchInput} onChange={table.setSearchInput} placeholder="Buscar por nombre..." />}
+        expandable={
+          isSearching
+            ? undefined
+            : {
+                canExpand: (category) => category.subcategoriesCount > 0,
+                renderRows: (category) => <SubcategoryRows parent={category} columns={columns} />,
+                label: (category) => `Mostrar subcategorías de ${category.name}`,
+              }
+        }
       />
 
       <CategoryFormDialog open={crud.formOpen} onOpenChange={crud.setFormOpen} category={crud.editing} />

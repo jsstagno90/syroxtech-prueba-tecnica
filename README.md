@@ -64,7 +64,7 @@ Requisitos: **Node 22+**, **pnpm 10** (`corepack enable`) y **Docker** (o un Pos
 
 ```bash
 pnpm install
-pnpm db:up                                   # PostgreSQL en Docker (puerto 5432)
+pnpm db:up                                   # PostgreSQL en Docker (puerto 5433)
 cp apps/api/.env.example apps/api/.env       # en Windows: copy apps\api\.env.example apps\api\.env
 cp apps/web/.env.example apps/web/.env.local
 pnpm db:migrate                              # crea las tablas

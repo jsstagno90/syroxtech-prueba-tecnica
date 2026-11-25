@@ -5,11 +5,16 @@ import type { ListParams } from '@/lib/api/types';
 
 export type CategorySortKey = 'name' | 'position' | 'createdAt';
 
+export interface CategoryFilters {
+  parentId?: number;
+  rootOnly?: boolean;
+}
+
 export const categoriesApi = createResourceApi<
   CategoryResponse,
   CreateCategoryDto,
   UpdateCategoryDto,
-  ListParams<CategorySortKey>,
+  ListParams<CategorySortKey> & CategoryFilters,
   CategoryOption
 >('categories');
 
