@@ -1,11 +1,13 @@
 'use client';
 
 import { Fragment, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Inbox } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Inbox, X } from 'lucide-react';
 import type { PaginationMeta, SortOrder } from '@admin/shared';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { RowKey } from '@/hooks/use-row-selection';
 import { cn } from '@/lib/utils';
 import { DataTablePagination } from './data-table-pagination';
 import type { Column } from './types';
@@ -23,6 +25,18 @@ export interface DataTableExpandable<T> {
   renderRows: (row: T) => ReactNode;
   /** Para el aria-label del botón: "Mostrar subcategorías de Hombre". */
   label?: (row: T) => string;
+}
+
+/** Selección de filas con checkboxes para acciones masivas (ver useRowSelection). */
+export interface DataTableSelection<T> {
+  selected: ReadonlySet<RowKey>;
+  setSelected: (next: ReadonlySet<RowKey>) => void;
+  /** Botones que aparecen en la barra cuando hay filas elegidas. */
+  actions: ReactNode;
+  /** Para el aria-label de cada checkbox: "Seleccionar Remera Nike". */
+  label?: (row: T) => string;
+  /** Sustantivo para la barra: "1 producto seleccionado" / "3 productos seleccionados". */
+  noun?: { singular: string; plural: string };
 }
 
 interface DataTableProps<T> {
@@ -45,6 +59,7 @@ interface DataTableProps<T> {
   /** Texto arriba de la tabla, ej. "Listado de ventas". */
   title?: string;
   expandable?: DataTableExpandable<T>;
+  selection?: DataTableSelection<T>;
 }
 
 /**
@@ -68,9 +83,32 @@ export function DataTable<T>({
   toolbar,
   title,
   expandable,
+  selection,
 }: DataTableProps<T>) {
   const [expanded, setExpanded] = useState<Set<string | number>>(new Set());
-  const totalColumns = columns.length + (expandable ? 1 : 0);
+  const totalColumns = columns.length + (expandable ? 1 : 0) + (selection ? 1 : 0);
+
+  // El checkbox del encabezado elige o quita todas las filas de la página actual.
+  const pageKeys = data?.map(getRowKey) ?? [];
+  const selectedOnPage = selection ? pageKeys.filter((key) => selection.selected.has(key)).length : 0;
+  const headerChecked =
+    pageKeys.length > 0 && selectedOnPage === pageKeys.length ? true : selectedOnPage > 0 ? 'indeterminate' : false;
+
+  const togglePage = () => {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    if (headerChecked === true) pageKeys.forEach((key) => next.delete(key));
+    else pageKeys.forEach((key) => next.add(key));
+    selection.setSelected(next);
+  };
+
+  const toggleSelected = (key: RowKey) => {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selection.setSelected(next);
+  };
 
   const toggleRow = (key: string | number) =>
     setExpanded((current) => {
@@ -89,10 +127,30 @@ export function DataTable<T>({
         </div>
       )}
 
+      {selection && selection.selected.size > 0 && (
+        <BulkActionsBar
+          count={selection.selected.size}
+          noun={selection.noun}
+          onClear={() => selection.setSelected(new Set())}
+        >
+          {selection.actions}
+        </BulkActionsBar>
+      )}
+
       <div className={cn('transition-opacity', isFetching && !isLoading && 'opacity-60')} aria-busy={isFetching}>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              {selection && (
+                <TableHead className="w-10 pr-0">
+                  <Checkbox
+                    checked={headerChecked}
+                    onCheckedChange={togglePage}
+                    disabled={!pageKeys.length || isLoading}
+                    aria-label={headerChecked === true ? 'Quitar selección de esta página' : 'Seleccionar toda la página'}
+                  />
+                </TableHead>
+              )}
               {expandable && <TableHead className="w-10" aria-hidden />}
               {columns.map((column) => (
                 <TableHead key={column.id} className={column.headerClassName}>
@@ -109,6 +167,7 @@ export function DataTable<T>({
             {isLoading ? (
               Array.from({ length: 5 }, (_, index) => (
                 <TableRow key={index} className="hover:bg-transparent">
+                  {selection && <TableCell />}
                   {expandable && <TableCell />}
                   {columns.map((column) => (
                     <TableCell key={column.id}>
@@ -143,9 +202,19 @@ export function DataTable<T>({
                 const key = getRowKey(row);
                 const canExpand = expandable?.canExpand(row) ?? false;
                 const isOpen = canExpand && expanded.has(key);
+                const isSelected = selection?.selected.has(key) ?? false;
                 return (
                   <Fragment key={key}>
-                    <TableRow data-state={isOpen ? 'open' : undefined}>
+                    <TableRow data-state={isSelected ? 'selected' : isOpen ? 'open' : undefined}>
+                      {selection && (
+                        <TableCell className="w-10 pr-0">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelected(key)}
+                            aria-label={selection.label?.(row) ?? 'Seleccionar fila'}
+                          />
+                        </TableCell>
+                      )}
                       {expandable && (
                         <TableCell className="w-10 pr-0">
                           {canExpand && (
@@ -175,6 +244,37 @@ export function DataTable<T>({
       {meta && onPageChange && (
         <DataTablePagination meta={meta} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
       )}
+    </div>
+  );
+}
+
+/** Barra de acciones masivas: cuántas filas hay elegidas, qué se puede hacer con ellas y cómo soltarlas. */
+function BulkActionsBar({
+  count,
+  noun = { singular: 'registro', plural: 'registros' },
+  onClear,
+  children,
+}: {
+  count: number;
+  noun?: { singular: string; plural: string };
+  onClear: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role="region"
+      aria-label="Acciones sobre la selección"
+      className="bg-muted/60 flex flex-col gap-2 border-b px-4 py-2.5 sm:flex-row sm:items-center"
+    >
+      <div className="flex items-center gap-1">
+        <p className="text-sm font-medium" aria-live="polite">
+          {count} {count === 1 ? `${noun.singular} seleccionado` : `${noun.plural} seleccionados`}
+        </p>
+        <Button variant="ghost" size="icon-sm" className="size-7" onClick={onClear} aria-label="Quitar selección">
+          <X className="size-4" />
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-2 sm:ml-auto">{children}</div>
     </div>
   );
 }

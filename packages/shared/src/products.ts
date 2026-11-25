@@ -62,3 +62,36 @@ export interface ProductOption extends EntityRef {
   price: number;
   imageUrl: string | null;
 }
+
+/* --------------------------- Edición masiva --------------------------- */
+
+const bulkIdsSchema = z
+  .array(z.number().int().positive())
+  .min(1, 'Elegí al menos un producto')
+  .max(500, 'Máximo 500 productos por vez')
+  .transform((ids) => [...new Set(ids)]);
+
+/** Mismos campos y reglas que la edición individual, aplicados a varios productos a la vez. */
+export const bulkUpdateProductsSchema = z.object({
+  ids: bulkIdsSchema,
+  data: z
+    .object({
+      categoryId: productFields.categoryId,
+      brandId: productFields.brandId,
+      isActive: productFields.isActive,
+    })
+    .partial()
+    .refine((data) => Object.values(data).some((value) => value !== undefined), 'Indicá qué querés cambiar'),
+});
+
+export const bulkDeleteProductsSchema = z.object({ ids: bulkIdsSchema });
+
+export type BulkUpdateProductsInput = z.input<typeof bulkUpdateProductsSchema>;
+export type BulkUpdateProductsDto = z.output<typeof bulkUpdateProductsSchema>;
+export type BulkDeleteProductsInput = z.input<typeof bulkDeleteProductsSchema>;
+export type BulkDeleteProductsDto = z.output<typeof bulkDeleteProductsSchema>;
+
+/** Cantidad de productos afectados por una operación masiva. */
+export interface BulkProductsResult {
+  count: number;
+}

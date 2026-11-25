@@ -1,11 +1,15 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  bulkDeleteProductsSchema,
+  bulkUpdateProductsSchema,
   createProductSchema,
   idParamSchema,
   importProductsSchema,
   productListQuerySchema,
   updateProductSchema,
+  type BulkDeleteProductsDto,
+  type BulkUpdateProductsDto,
   type CreateProductDto,
   type ImportProductsDto,
   type ProductListQuery,
@@ -43,6 +47,20 @@ export class ProductsController {
   })
   import(@Body({ schema: importProductsSchema }) body: ImportProductsDto) {
     return this.productsImport.import(body);
+  }
+
+  // Las rutas fijas van antes que las de `:id` para que "bulk" no se tome como un id.
+  @Patch('bulk')
+  @ApiOperation({ summary: 'Cambia categoría, marca o estado de varios productos a la vez' })
+  bulkUpdate(@Body({ schema: bulkUpdateProductsSchema }) body: BulkUpdateProductsDto) {
+    return this.products.bulkUpdate(body);
+  }
+
+  @Post('bulk-delete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Elimina varios productos a la vez' })
+  bulkRemove(@Body({ schema: bulkDeleteProductsSchema }) body: BulkDeleteProductsDto) {
+    return this.products.bulkRemove(body);
   }
 
   @Get(':id')

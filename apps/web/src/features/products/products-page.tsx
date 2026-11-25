@@ -13,10 +13,12 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCrudState } from '@/hooks/use-crud-state';
+import { useRowSelection } from '@/hooks/use-row-selection';
 import { useTableState } from '@/hooks/use-table-state';
 import { brandHooks } from '@/features/brands/api';
 import { buildCategoryPaths, categoryHooks } from '@/features/categories/api';
 import { productHooks, type ProductFilters, type ProductSortKey } from './api';
+import { ProductBulkActions } from './bulk-actions';
 import { getProductColumns } from './columns';
 import { exportProducts } from './export-products';
 import { ImportProductsDialog } from './import/import-products-dialog';
@@ -30,6 +32,7 @@ export function ProductsPage() {
   const crud = useCrudState<ProductResponse>();
   const [filters, setFilters] = useState<ProductFilters>({});
   const [importOpen, setImportOpen] = useState(false);
+  const selection = useRowSelection();
   const list = productHooks.useList({ ...table.query, ...filters });
   const remove = productHooks.useRemove();
   const { data: categories = [] } = categoryHooks.useOptions();
@@ -41,10 +44,21 @@ export function ProductsPage() {
     [router, askDelete],
   );
   const categoryOptions = useMemo(() => buildCategoryPaths(categories), [categories]);
+  const categorySelectOptions = useMemo(
+    () => categoryOptions.map((category) => ({ value: category.id, label: category.path })),
+    [categoryOptions],
+  );
+  const brandSelectOptions = useMemo(() => brands.map((brand) => ({ value: brand.id, label: brand.name })), [brands]);
 
+  // Al cambiar filtros o búsqueda se suelta la selección, para no editar productos que ya no se ven.
   const updateFilter = (patch: ProductFilters) => {
     setFilters((current) => ({ ...current, ...patch }));
     table.resetPage();
+    selection.clear();
+  };
+  const updateSearch = (value: string) => {
+    table.setSearchInput(value);
+    selection.clear();
   };
   const hasFilters = Object.values(filters).some((value) => value !== undefined) || !!table.searchInput;
 
@@ -82,12 +96,26 @@ export function ProductsPage() {
         sort={table.sort}
         onPageChange={table.setPage}
         onPageSizeChange={table.setPageSize}
+        selection={{
+          selected: selection.selected,
+          setSelected: selection.setSelected,
+          label: (product) => `Seleccionar ${product.name}`,
+          noun: { singular: 'producto', plural: 'productos' },
+          actions: (
+            <ProductBulkActions
+              ids={selection.keys.map(Number)}
+              categoryOptions={categorySelectOptions}
+              brandOptions={brandSelectOptions}
+              onDone={selection.clear}
+            />
+          ),
+        }}
         emptyMessage={hasFilters ? 'Ningún producto coincide con los filtros.' : 'Todavía no hay productos.'}
         toolbar={
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
             <SearchInput
               value={table.searchInput}
-              onChange={table.setSearchInput}
+              onChange={updateSearch}
               placeholder="Buscar por nombre o SKU..."
               className="lg:max-w-sm"
             />
@@ -146,7 +174,7 @@ export function ProductsPage() {
                   variant="ghost"
                   onClick={() => {
                     setFilters({});
-                    table.setSearchInput('');
+                    updateSearch('');
                   }}
                 >
                   <FilterX /> Limpiar
@@ -171,7 +199,13 @@ export function ProductsPage() {
         confirmLabel="Eliminar"
         destructive
         loading={remove.isPending}
-        onConfirm={() => remove.mutateAsync(crud.deleting!.id).then(crud.closeDelete, () => undefined)}
+        onConfirm={() => {
+          const id = crud.deleting!.id;
+          return remove.mutateAsync(id).then(() => {
+            selection.remove([id]);
+            crud.closeDelete();
+          }, () => undefined);
+        }}
       />
     </>
   );

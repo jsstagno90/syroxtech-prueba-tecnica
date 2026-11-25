@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type {
+  BulkDeleteProductsDto,
+  BulkProductsResult,
+  BulkUpdateProductsDto,
   CreateProductDto,
   PaginatedResponse,
   ProductListQuery,
@@ -70,6 +73,32 @@ export class ProductsService {
   async remove(id: number): Promise<void> {
     await this.getOrThrow(id);
     await this.prisma.product.delete({ where: { id } });
+  }
+
+  /** Cambia categoría, marca o estado de varios productos en una sola operación. */
+  async bulkUpdate({ ids, data }: BulkUpdateProductsDto): Promise<BulkProductsResult> {
+    await this.assertAllExist(ids);
+    await this.assertRelationsExist(data.categoryId, data.brandId);
+    const { count } = await this.prisma.product.updateMany({ where: { id: { in: ids } }, data });
+    return { count };
+  }
+
+  /** Igual que el borrado individual: las ventas conservan su copia del nombre y el precio. */
+  async bulkRemove({ ids }: BulkDeleteProductsDto): Promise<BulkProductsResult> {
+    await this.assertAllExist(ids);
+    const { count } = await this.prisma.product.deleteMany({ where: { id: { in: ids } } });
+    return { count };
+  }
+
+  /** Todo o nada: si falta alguno no se toca ninguno (pudo haberlo borrado otra persona). */
+  private async assertAllExist(ids: number[]) {
+    const found = await this.prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    if (found.length === ids.length) return;
+    const existing = new Set(found.map((product) => product.id));
+    const missing = ids.filter((id) => !existing.has(id));
+    throw new NotFoundException(
+      missing.length === 1 ? `El producto ${missing[0]} ya no existe` : `Estos productos ya no existen: ${missing.join(', ')}`,
+    );
   }
 
   private async getOrThrow(id: number): Promise<ProductWithRelations> {
