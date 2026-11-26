@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type {
   BulkDeleteProductsDto,
+  BulkPriceChangeDto,
   BulkProductsResult,
   BulkUpdateProductsDto,
   CreateProductDto,
@@ -11,6 +12,7 @@ import type {
   UpdateProductDto,
   VariantOption,
 } from '@admin/shared';
+import { applyPriceChange } from '@admin/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { toNumber } from '../common/http/decimal.js';
 import { paginate, toPrismaPage } from '../common/http/pagination.js';
@@ -98,6 +100,37 @@ export class ProductsService {
     await this.assertRelationsExist(data.categoryId, data.brandId);
     const { count } = await this.prisma.product.updateMany({ where: { id: { in: ids } }, data });
     return { count };
+  }
+
+  /**
+   * Sube o baja el precio de varios productos en un porcentaje, con el redondeo elegido.
+   * Las variantes con precio propio se ajustan igual; las que usan el del producto lo siguen solas.
+   */
+  async bulkChangePrice({ ids, percent, roundTo }: BulkPriceChangeDto): Promise<BulkProductsResult> {
+    await this.assertAllExist(ids);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, price: true, variants: { where: { price: { not: null } }, select: { id: true, price: true } } },
+    });
+    const variants = products.flatMap((product) => product.variants);
+
+    await this.prisma.$transaction(
+      [
+        ...products.map((product) =>
+          this.prisma.product.update({
+            where: { id: product.id },
+            data: { price: applyPriceChange(toNumber(product.price), percent, roundTo) },
+          }),
+        ),
+        ...variants.map((variant) =>
+          this.prisma.productVariant.update({
+            where: { id: variant.id },
+            data: { price: applyPriceChange(toNumber(variant.price!), percent, roundTo) },
+          }),
+        ),
+      ],
+    );
+    return { count: products.length, variants: variants.length };
   }
 
   /** Igual que el borrado individual: las ventas conservan su copia del nombre y el precio. */

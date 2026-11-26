@@ -227,6 +227,45 @@ export const bulkUpdateProductsSchema = z.object({
 
 export const bulkDeleteProductsSchema = z.object({ ids: bulkIdsSchema });
 
+/* ------------------------ Cambio de precio en % ------------------------ */
+
+/** A cuánto se redondea el precio nuevo (0.01 = sin redondear, al centavo). */
+export const PRICE_ROUNDINGS = [0.01, 1, 10, 100] as const;
+export type PriceRounding = (typeof PRICE_ROUNDINGS)[number];
+
+export const PRICE_ROUNDING_LABELS: Record<PriceRounding, string> = {
+  0.01: 'Sin redondear',
+  1: 'Al peso ($1)',
+  10: 'A $10',
+  100: 'A $100',
+};
+
+export const bulkPriceChangeSchema = z.object({
+  ids: bulkIdsSchema,
+  /** Positivo sube, negativo baja: 10 = +10 %, -15 = -15 %. */
+  percent: z
+    .number({ error: 'Ingresá un porcentaje' })
+    .min(-90, 'No se puede bajar más de 90 %')
+    .max(500, 'Máximo 500 %')
+    .refine((value) => value !== 0, 'Tiene que ser distinto de 0'),
+  roundTo: z.union(PRICE_ROUNDINGS.map((value) => z.literal(value))).default(1),
+});
+
+export type BulkPriceChangeInput = z.input<typeof bulkPriceChangeSchema>;
+export type BulkPriceChangeDto = z.output<typeof bulkPriceChangeSchema>;
+
+/**
+ * Precio nuevo después de aplicar un porcentaje y redondear.
+ * Nunca queda en 0: como mínimo vale un escalón de redondeo.
+ * Lo usan la API (para guardar) y el panel (para la vista previa), así coinciden siempre.
+ */
+export function applyPriceChange(price: number, percent: number, roundTo: number = 1): number {
+  const cents = Math.round(price * 100 * (1 + percent / 100));
+  const step = Math.round(roundTo * 100);
+  const rounded = Math.round(cents / step) * step;
+  return Math.max(step, rounded) / 100;
+}
+
 export type BulkUpdateProductsInput = z.input<typeof bulkUpdateProductsSchema>;
 export type BulkUpdateProductsDto = z.output<typeof bulkUpdateProductsSchema>;
 export type BulkDeleteProductsInput = z.input<typeof bulkDeleteProductsSchema>;
@@ -235,4 +274,6 @@ export type BulkDeleteProductsDto = z.output<typeof bulkDeleteProductsSchema>;
 /** Cantidad de productos afectados por una operación masiva. */
 export interface BulkProductsResult {
   count: number;
+  /** En el cambio de precio: cuántas variantes con precio propio se ajustaron también. */
+  variants?: number;
 }

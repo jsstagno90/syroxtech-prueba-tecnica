@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Eye, EyeOff, FolderTree, Loader2, Tag, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, FolderTree, Loader2, Percent, Tag, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { ConfirmDialog } from '@/components/crud/confirm-dialog';
 import { FormDialog } from '@/components/crud/form-dialog';
 import { SelectField, type SelectOption } from '@/components/form/fields';
 import { Button } from '@/components/ui/button';
-import { useBulkDeleteProducts, useBulkUpdateProducts } from './api';
+import type { ProductResponse } from '@admin/shared';
+import { useBulkChangePrice, useBulkDeleteProducts, useBulkUpdateProducts } from './api';
+import { PriceChangeDialog } from './price-change-dialog';
 
 const categorySchema = z.object({
   categoryId: z.number({ error: 'Elegí una categoría' }).int().positive('Elegí una categoría'),
@@ -20,21 +22,24 @@ const brandSchema = z.object({
 /** "1 producto" / "3 productos". */
 export const productCount = (count: number) => `${count} ${count === 1 ? 'producto' : 'productos'}`;
 
-type Dialog = 'category' | 'brand' | 'delete' | null;
+type Dialog = 'category' | 'brand' | 'price' | 'delete' | null;
 
 interface ProductBulkActionsProps {
   ids: number[];
   categoryOptions: SelectOption[];
   brandOptions: SelectOption[];
+  /** Los elegidos que están en la página actual (para la vista previa del cambio de precio). */
+  samples: ProductResponse[];
   /** Después de aplicar: limpia la selección (y, si se eliminaron, saca esos ids). */
   onDone: () => void;
 }
 
-export function ProductBulkActions({ ids, categoryOptions, brandOptions, onDone }: ProductBulkActionsProps) {
+export function ProductBulkActions({ ids, categoryOptions, brandOptions, samples, onDone }: ProductBulkActionsProps) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const bulkUpdate = useBulkUpdateProducts();
   const bulkDelete = useBulkDeleteProducts();
-  const busy = bulkUpdate.isPending || bulkDelete.isPending;
+  const bulkPrice = useBulkChangePrice();
+  const busy = bulkUpdate.isPending || bulkDelete.isPending || bulkPrice.isPending;
   const total = productCount(ids.length);
 
   // Desde los diálogos con formulario: si falla, FormDialog muestra el error y queda abierto.
@@ -58,6 +63,9 @@ export function ProductBulkActions({ ids, categoryOptions, brandOptions, onDone 
       </Button>
       <Button variant="outline" size="sm" disabled={busy} onClick={() => setDialog('brand')}>
         <Tag /> Cambiar marca
+      </Button>
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => setDialog('price')}>
+        <Percent /> Cambiar precio
       </Button>
       <Button variant="outline" size="sm" disabled={busy} onClick={() => setActive(true)}>
         {bulkUpdate.isPending && bulkUpdate.variables?.data.isActive === true ? <Loader2 className="animate-spin" /> : <Eye />}
@@ -128,6 +136,22 @@ export function ProductBulkActions({ ids, categoryOptions, brandOptions, onDone 
           />
         )}
       </FormDialog>
+
+      <PriceChangeDialog
+        open={dialog === 'price'}
+        onOpenChange={(open) => !open && setDialog(null)}
+        ids={ids}
+        samples={samples}
+        onSubmit={async (values) => {
+          const { count, variants = 0 } = await bulkPrice.mutateAsync(values);
+          const sign = values.percent > 0 ? '+' : '';
+          toast.success(
+            `Precio actualizado (${sign}${values.percent.toLocaleString('es-AR')} %) en ${productCount(count)}` +
+              (variants ? ` y ${variants} ${variants === 1 ? 'variante' : 'variantes'}` : ''),
+          );
+          onDone();
+        }}
+      />
 
       <ConfirmDialog
         open={dialog === 'delete'}

@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Inbox, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Inbox, Loader2, X } from 'lucide-react';
 import type { PaginationMeta, SortOrder } from '@admin/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -37,6 +37,11 @@ export interface DataTableSelection<T> {
   label?: (row: T) => string;
   /** Sustantivo para la barra: "1 producto seleccionado" / "3 productos seleccionados". */
   noun?: { singular: string; plural: string };
+  /**
+   * Elegir todas las filas que coinciden con la búsqueda y los filtros, no solo las de la página.
+   * Recibe la tabla con su total (meta.total) para ofrecerlo solo cuando hace falta.
+   */
+  onSelectAll?: () => Promise<void>;
 }
 
 interface DataTableProps<T> {
@@ -130,8 +135,10 @@ export function DataTable<T>({
       {selection && selection.selected.size > 0 && (
         <BulkActionsBar
           count={selection.selected.size}
+          total={meta?.total}
           noun={selection.noun}
           onClear={() => selection.setSelected(new Set())}
+          onSelectAll={selection.onSelectAll}
         >
           {selection.actions}
         </BulkActionsBar>
@@ -251,15 +258,22 @@ export function DataTable<T>({
 /** Barra de acciones masivas: cuántas filas hay elegidas, qué se puede hacer con ellas y cómo soltarlas. */
 function BulkActionsBar({
   count,
+  total,
   noun = { singular: 'registro', plural: 'registros' },
   onClear,
+  onSelectAll,
   children,
 }: {
   count: number;
+  total?: number;
   noun?: { singular: string; plural: string };
   onClear: () => void;
+  onSelectAll?: () => Promise<void>;
   children: ReactNode;
 }) {
+  const [selectingAll, setSelectingAll] = useState(false);
+  const canSelectAll = !!onSelectAll && total !== undefined && count < total;
+
   return (
     <div
       role="region"
@@ -273,6 +287,21 @@ function BulkActionsBar({
         <Button variant="ghost" size="icon-sm" className="size-7" onClick={onClear} aria-label="Quitar selección">
           <X className="size-4" />
         </Button>
+        {canSelectAll && (
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto px-1"
+            disabled={selectingAll}
+            onClick={() => {
+              setSelectingAll(true);
+              onSelectAll().finally(() => setSelectingAll(false));
+            }}
+          >
+            {selectingAll && <Loader2 className="animate-spin" />}
+            Seleccionar los {total} {noun.plural}
+          </Button>
+        )}
       </div>
       <div className="flex flex-wrap gap-2 sm:ml-auto">{children}</div>
     </div>

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   BulkDeleteProductsInput,
+  BulkPriceChangeInput,
   BulkProductsResult,
   BulkUpdateProductsInput,
   CreateProductDto,
@@ -58,6 +59,15 @@ export function useBulkDeleteProducts() {
   const invalidate = useInvalidateProducts();
   return useMutation({
     mutationFn: (body: BulkDeleteProductsInput) => apiClient.post<BulkProductsResult>('products/bulk-delete', body),
+    onSuccess: () => invalidate(),
+  });
+}
+
+/** Sube o baja el precio de varios productos en un porcentaje. */
+export function useBulkChangePrice() {
+  const invalidate = useInvalidateProducts();
+  return useMutation({
+    mutationFn: (body: BulkPriceChangeInput) => apiClient.patch<BulkProductsResult>('products/bulk/price', body),
     onSuccess: () => invalidate(),
   });
 }

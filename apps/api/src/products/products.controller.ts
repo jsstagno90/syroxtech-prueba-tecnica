@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   bulkDeleteProductsSchema,
+  bulkPriceChangeSchema,
   bulkUpdateProductsSchema,
   createProductSchema,
   idParamSchema,
@@ -9,6 +10,7 @@ import {
   productListQuerySchema,
   updateProductSchema,
   type BulkDeleteProductsDto,
+  type BulkPriceChangeDto,
   type BulkUpdateProductsDto,
   type CreateProductDto,
   type ImportProductsDto,
@@ -54,6 +56,12 @@ export class ProductsController {
   @ApiOperation({ summary: 'Cambia categoría, marca o estado de varios productos a la vez' })
   bulkUpdate(@Body({ schema: bulkUpdateProductsSchema }) body: BulkUpdateProductsDto) {
     return this.products.bulkUpdate(body);
+  }
+
+  @Patch('bulk/price')
+  @ApiOperation({ summary: 'Sube o baja en un porcentaje el precio de varios productos (y de sus variantes con precio propio)' })
+  bulkChangePrice(@Body({ schema: bulkPriceChangeSchema }) body: BulkPriceChangeDto) {
+    return this.products.bulkChangePrice(body);
   }
 
   @Post('bulk-delete')

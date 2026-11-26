@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FileUp, FilterX, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import type { ProductResponse } from '@admin/shared';
 import { ConfirmDialog } from '@/components/crud/confirm-dialog';
 import { ExportButton } from '@/components/crud/export-button';
@@ -17,11 +18,15 @@ import { useRowSelection } from '@/hooks/use-row-selection';
 import { useTableState } from '@/hooks/use-table-state';
 import { brandHooks } from '@/features/brands/api';
 import { buildCategoryPaths, categoryHooks } from '@/features/categories/api';
-import { productHooks, type ProductFilters, type ProductSortKey } from './api';
+import { fetchAllPages } from '@/lib/export-excel';
+import { productHooks, productsApi, type ProductFilters, type ProductSortKey } from './api';
 import { ProductBulkActions } from './bulk-actions';
 import { getProductColumns } from './columns';
 import { exportProducts } from './export-products';
 import { ImportProductsDialog } from './import/import-products-dialog';
+
+/** Lo mismo que acepta la API por operación masiva. */
+const MAX_BULK = 500;
 
 const ALL = 'all';
 const NO_BRAND = 'none';
@@ -101,9 +106,16 @@ export function ProductsPage() {
           setSelected: selection.setSelected,
           label: (product) => `Seleccionar ${product.name}`,
           noun: { singular: 'producto', plural: 'productos' },
+          // Todos los que coinciden con la búsqueda y los filtros, de todas las páginas.
+          onSelectAll: async () => {
+            const all = await fetchAllPages(productsApi.list, { ...table.query, ...filters });
+            if (all.length > MAX_BULK) toast.warning(`Se eligen los primeros ${MAX_BULK}: es el máximo por operación`);
+            selection.setSelected(new Set(all.slice(0, MAX_BULK).map((product) => product.id)));
+          },
           actions: (
             <ProductBulkActions
               ids={selection.keys.map(Number)}
+              samples={(list.data?.data ?? []).filter((product) => selection.selected.has(product.id))}
               categoryOptions={categorySelectOptions}
               brandOptions={brandSelectOptions}
               onDone={selection.clear}
